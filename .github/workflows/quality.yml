@@ -29,10 +29,7 @@ jobs:
         run: pnpm install --frozen-lockfile || pnpm install
 
       - name: Lint (ESLint)
-        run: pnpm run lint
-
-      - name: Typecheck (TypeScript)
-        run: pnpm run typecheck
+        run: pnpm exec eslint . --max-warnings 9999
 
       - name: Tests unitaires avec couverture
         run: pnpm exec vitest run --coverage

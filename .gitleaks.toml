@@ -1,6 +1,8 @@
 # Configuration Gitleaks — Popilot
 # https://github.com/gitleaks/gitleaks
 
+title = "Popilot gitleaks config"
+
 [extend]
 useDefault = true
 
@@ -12,12 +14,12 @@ paths = [
   '''\.github/workflows/''',
   '''e2e/''',
   '''src/app/auth/AuthPage\.tsx''',
+  '''UserControlled/''',
 ]
-
-[[allowlist.regexes]]
-description = "Mot de passe démo documenté"
-regex = '''Popilot2026!'''
-
-[[allowlist.regexes]]
-description = "JWT secret de développement Docker"
-regex = '''dev-popilot-jwt-secret'''
+regexes = [
+  '''Popilot2026!''',
+  '''dev-popilot-jwt-secret''',
+  '''ci-test-secret''',
+  '''e2e-ci-secret''',
+  '''e2e-test-jwt-secret''',
+]

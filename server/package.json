@@ -7,7 +7,7 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "hash-password": "node src/scripts/hash-password.js",
-    "test": "node --test test/**/*.test.js"
+    "test": "node --test test/"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
