@@ -1,0 +1,60 @@
+name: Qualité & couverture
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    name: Quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Installer les dépendances
+        run: pnpm install --frozen-lockfile || pnpm install
+
+      - name: Lint (ESLint)
+        run: pnpm run lint
+
+      - name: Typecheck (TypeScript)
+        run: pnpm run typecheck
+
+      - name: Tests unitaires avec couverture
+        run: pnpm exec vitest run --coverage
+
+      - name: Publier le rapport de couverture
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
+
+  docker-build:
+    name: Build Docker (validation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image application
+        run: docker build -t popilot-app:ci .
+
+      - name: Build image API
+        run: docker build -t popilot-api:ci ./server

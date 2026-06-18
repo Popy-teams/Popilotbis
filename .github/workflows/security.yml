@@ -1,0 +1,88 @@
+name: Sécurité
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  gitleaks:
+    name: Détection de secrets (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  trivy:
+    name: Scan vulnérabilités (Trivy)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: filesystem
+            scan-type: fs
+            scan-ref: .
+          - name: docker-app
+            scan-type: config
+            scan-ref: Dockerfile
+          - name: docker-api
+            scan-type: config
+            scan-ref: server/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy — ${{ matrix.target.name }}
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          scan-type: ${{ matrix.target.scan-type }}
+          scan-ref: ${{ matrix.target.scan-ref }}
+          format: sarif
+          output: trivy-${{ matrix.target.name }}.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: trivy-${{ matrix.target.name }}.sarif
+          category: trivy-${{ matrix.target.name }}
+
+  npm-audit:
+    name: Audit npm (frontend + API)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Audit frontend
+        run: |
+          pnpm install --frozen-lockfile || pnpm install
+          pnpm audit --audit-level=high || true
+
+      - name: Audit API
+        working-directory: server
+        run: |
+          npm ci || npm install
+          npm audit --audit-level=high || true

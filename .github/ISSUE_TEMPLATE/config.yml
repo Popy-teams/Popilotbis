@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation projet
+    url: https://github.com/Meriem1403/Popilotbis#readme
+    about: Consulter le README et la doc d'installation
+  - name: Discussions GitHub
+    url: https://github.com/Meriem1403/Popilotbis/discussions
+    about: Questions générales et idées

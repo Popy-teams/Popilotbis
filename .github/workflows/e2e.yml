@@ -1,0 +1,72 @@
+name: E2E Playwright
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  playwright:
+    name: Tests E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Installer les dépendances frontend
+        run: pnpm install --frozen-lockfile || pnpm install
+
+      - name: Installer les dépendances API
+        working-directory: server
+        run: npm ci || npm install
+
+      - name: Installer les navigateurs Playwright
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Build frontend
+        run: pnpm run build
+
+      - name: Exécuter les tests E2E
+        env:
+          CI: true
+          DATABASE_URL: postgresql://popilot:popilot@localhost:5432/popilot
+          JWT_SECRET: e2e-ci-secret
+        run: pnpm run test:e2e
+
+      - name: Publier le rapport Playwright
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: popilot
+          POSTGRES_USER: popilot
+          POSTGRES_PASSWORD: popilot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U popilot -d popilot"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
