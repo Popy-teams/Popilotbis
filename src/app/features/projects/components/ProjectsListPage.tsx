@@ -4,7 +4,7 @@ import { Project } from '../../../types';
 import { ProjectCard } from './ProjectCard';
 import { ProjectsTable } from './ProjectsTable';
 import { ProjectsToolbar } from './ProjectsToolbar';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton } from '../../../components/shared';
+import { ViewShell, AppIcon } from '../../../components/shared';
 
 interface ProjectsListPageProps {
   loading: boolean;

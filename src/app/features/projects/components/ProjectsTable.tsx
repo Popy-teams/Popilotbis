@@ -1,6 +1,6 @@
 import { Archive, Edit2, Trash2 } from 'lucide-react';
 import { Project } from '../../../types';
-import { getStatusColor, getStatusLabel } from './projectPresentation';
+import { getStatusColor, getStatusLabel, withEffectiveStatus } from './projectPresentation';
 
 interface ProjectsTableProps {
   projects: Project[];
@@ -14,7 +14,9 @@ export function ProjectsTable({ projects, onOpen, onEdit, onArchive, onDelete }:
   return (
     <>
       <div className="grid grid-cols-1 gap-3 md:hidden">
-        {projects.map((project) => (
+        {projects.map((raw) => {
+          const project = withEffectiveStatus(raw);
+          return (
           <div key={`mobile-${project.id}`} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm" onClick={() => onOpen(project)}>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
@@ -33,7 +35,8 @@ export function ProjectsTable({ projects, onOpen, onEdit, onArchive, onDelete }:
               <button className="w-8 h-8 inline-flex items-center justify-center hover:bg-red-50 rounded-lg" onClick={(e) => { e.stopPropagation(); onDelete(project); }}><Trash2 className="w-4 h-4 text-red-600" /></button>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -51,7 +54,9 @@ export function ProjectsTable({ projects, onOpen, onEdit, onArchive, onDelete }:
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {projects.map((project) => (
+              {projects.map((raw) => {
+                const project = withEffectiveStatus(raw);
+                return (
                 <tr key={project.id} className="hover:bg-slate-50/70 cursor-pointer" onClick={() => onOpen(project)}>
                   <td className="px-4 py-3"><p className="font-medium text-slate-900">{project.name}</p><p className="text-xs text-slate-500 line-clamp-1">{project.description}</p></td>
                   <td className="px-4 py-3"><span className={`saas-badge ${getStatusColor(project.status)}`}>{getStatusLabel(project.status)}</span></td>
@@ -61,7 +66,8 @@ export function ProjectsTable({ projects, onOpen, onEdit, onArchive, onDelete }:
                   <td className="px-4 py-3 text-sm text-slate-700">{project.team?.slice(0, 3).join(', ') || '-'}</td>
                   <td className="px-4 py-3"><div className="flex items-center justify-end gap-1"><button className="w-8 h-8 inline-flex items-center justify-center hover:bg-slate-100 rounded-lg" onClick={(e) => { e.stopPropagation(); onEdit(project); }}><Edit2 className="w-4 h-4 text-slate-500" /></button><button className="w-8 h-8 inline-flex items-center justify-center hover:bg-slate-100 rounded-lg" onClick={(e) => { e.stopPropagation(); onArchive(project); }}><Archive className="w-4 h-4 text-slate-500" /></button><button className="w-8 h-8 inline-flex items-center justify-center hover:bg-red-50 rounded-lg" onClick={(e) => { e.stopPropagation(); onDelete(project); }}><Trash2 className="w-4 h-4 text-red-600" /></button></div></td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

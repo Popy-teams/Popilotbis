@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, FolderKanban, LogOut, Menu, Search } from 'lucide-react';
+import { Bell, ChevronDown, FolderKanban, LogOut, Menu } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import type { AuthUser } from '../auth/authApi';
 import { useAuth } from '../auth/AuthContext';
@@ -6,6 +6,7 @@ import { useProjectContext } from '../context/ProjectContext';
 import { LOGIN_PATH } from '../routes/viewRoutes';
 import { AppIcon } from './shared/icons';
 import { IconButton } from './shared/IconButton';
+import { SearchField } from './shared/SearchField';
 
 interface HeaderProps {
   user: AuthUser;
@@ -36,17 +37,17 @@ export function Header({ user, onMenuClick }: HeaderProps) {
           </button>
         ) : null}
 
-        <div className="relative shrink-0">
+        <div className="relative shrink-0 min-w-0 max-w-[min(100%,14rem)] sm:max-w-none">
           <label htmlFor="active-project" className="sr-only">
             Projet actif
           </label>
-          <div className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/50 pl-3 pr-2 py-2 min-w-[10rem] sm:min-w-[14rem]">
-            <AppIcon icon={FolderKanban} size="sm" className="text-indigo-600 shrink-0" />
+          <div className="form-select-wrap rounded-xl border border-indigo-200 bg-indigo-50/50 min-w-[10rem] sm:min-w-[14rem]">
+            <AppIcon icon={FolderKanban} size="sm" className="form-select-icon text-indigo-600" />
             <select
               id="active-project"
               value={activeProjectId ?? ''}
               onChange={(e) => setActiveProjectId(e.target.value)}
-              className="flex-1 min-w-0 bg-transparent text-sm font-semibold text-indigo-900 outline-none cursor-pointer pr-6 appearance-none"
+              className="form-select form-select-with-icon bg-transparent border-0 shadow-none focus:shadow-none text-sm font-semibold text-indigo-900 min-h-[2.5rem] py-2 pr-9"
             >
               {visibleProjects.length === 0 ? (
                 <option value="">Aucun projet</option>
@@ -58,27 +59,19 @@ export function Header({ user, onMenuClick }: HeaderProps) {
                 ))
               )}
             </select>
-            <AppIcon icon={ChevronDown} size="xs" className="text-indigo-500 pointer-events-none -ml-5" />
+            <AppIcon icon={ChevronDown} size="xs" className="form-select-chevron text-indigo-500" />
           </div>
         </div>
 
         <div className="flex-1 min-w-0 max-w-xl hidden sm:block">
-          <div className="relative">
-            <AppIcon
-              icon={Search}
-              size="md"
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-            />
-            <input
-              type="text"
-              placeholder={
-                activeProject
-                  ? `Rechercher dans ${activeProject.name}...`
-                  : 'Rechercher un projet, une tâche...'
-              }
-              className="w-full pl-10 pr-4 py-2 saas-input text-sm"
-            />
-          </div>
+          <SearchField
+            placeholder={
+              activeProject
+                ? `Rechercher dans ${activeProject.name}...`
+                : 'Rechercher un projet, une tâche...'
+            }
+            className="saas-input text-sm"
+          />
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-auto">

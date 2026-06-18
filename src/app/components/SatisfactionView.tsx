@@ -35,7 +35,7 @@ import {
   Check,
 } from 'lucide-react';
 import { PageBackHeader } from './shared/PageBackHeader';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton } from './shared';
+import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton, SearchField } from './shared';
 
 type SurveyPhase = 'study' | 'prototype' | 'launch' | 'post-delivery' | 'continuous';
 type RespondentType = 'parent' | 'child' | 'teacher' | 'expert' | 'other';
@@ -613,17 +613,13 @@ export function SatisfactionView() {
       </div>
 
       {/* Filtres et recherche */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4">
-        <div className="flex-1 relative">
-          <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Rechercher dans les feedbacks..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-          />
-        </div>
+      <div className="bg-white rounded-lg border border-gray-200 p-4 filter-toolbar">
+        <SearchField
+          wrapperClassName="filter-toolbar-grow"
+          placeholder="Rechercher dans les feedbacks..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
         <button
           onClick={() => setActivePhase('all')}
           className={`px-4 py-2 rounded-lg font-medium transition-colors ${

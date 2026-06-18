@@ -20,6 +20,8 @@ export interface TestTask {
   }[];
   linkedToProcesses?: string[]; // IDs des processus liés
   linkedToProcessSteps?: string[]; // IDs des étapes de processus liées
+  /** Étape du pipeline projet (ex. stage-1 = Cadrage) */
+  stageId?: string;
 }
 
 export interface TestTeamMember {
@@ -109,6 +111,7 @@ export const TEST_TASKS: TestTask[] = [
     ],
     linkedToProcesses: ['proc-3'],
     linkedToProcessSteps: ['s3-4', 's3-5'],
+    stageId: 'stage-1',
   },
   {
     id: 'task-2',
@@ -130,6 +133,7 @@ export const TEST_TASKS: TestTask[] = [
       { id: 'st2-5', title: 'Guide de maintenance', completed: false },
     ],
     linkedToProcesses: ['proc-3'],
+    stageId: 'stage-1',
   },
   {
     id: 'task-3',
@@ -152,6 +156,7 @@ export const TEST_TASKS: TestTask[] = [
     ],
     linkedToProcesses: ['proc-6'],
     linkedToProcessSteps: ['s6-3'],
+    stageId: 'stage-1',
   },
   {
     id: 'task-4',
@@ -173,6 +178,7 @@ export const TEST_TASKS: TestTask[] = [
       { id: 'st4-5', title: 'Tests utilisateurs avec enfants', completed: false },
     ],
     linkedToProcesses: ['proc-3'],
+    stageId: 'stage-2',
   },
   {
     id: 'task-5',
@@ -194,6 +200,7 @@ export const TEST_TASKS: TestTask[] = [
     ],
     linkedToProcesses: ['proc-1', 'proc-6'],
     linkedToProcessSteps: ['s1-5', 's6-5'],
+    stageId: 'stage-2',
   },
   {
     id: 'task-6',
@@ -215,6 +222,7 @@ export const TEST_TASKS: TestTask[] = [
     ],
     linkedToProcesses: ['proc-2'],
     linkedToProcessSteps: ['s2-3', 's2-4'],
+    stageId: 'stage-2',
   },
   {
     id: 'task-7',
@@ -237,6 +245,7 @@ export const TEST_TASKS: TestTask[] = [
     ],
     linkedToProcesses: ['proc-5'],
     linkedToProcessSteps: ['s5-5'],
+    stageId: 'stage-2',
   },
   {
     id: 'task-8',
@@ -259,6 +268,7 @@ export const TEST_TASKS: TestTask[] = [
     ],
     linkedToProcesses: ['proc-6'],
     linkedToProcessSteps: ['s6-2'],
+    stageId: 'stage-3',
   },
   {
     id: 'task-9',
@@ -281,6 +291,7 @@ export const TEST_TASKS: TestTask[] = [
     ],
     linkedToProcesses: ['proc-7'],
     linkedToProcessSteps: ['s7-5'],
+    stageId: 'stage-3',
   },
   {
     id: 'task-10',
@@ -303,6 +314,7 @@ export const TEST_TASKS: TestTask[] = [
     ],
     linkedToProcesses: ['proc-8'],
     linkedToProcessSteps: ['s8-1', 's8-2'],
+    stageId: 'stage-3',
   },
   {
     id: 'task-11',

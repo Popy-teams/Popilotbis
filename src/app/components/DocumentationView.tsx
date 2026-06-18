@@ -28,7 +28,9 @@ import {
 } from 'lucide-react';
 import { PageBackHeader } from './shared/PageBackHeader';
 import { useProjectContext } from '../context/ProjectContext';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, StatIcon, IconButton, ActionButton, IconLabel } from './shared';
+import { usePipeline } from '../context/PipelineContext';
+import { applyPipelineSync, DOCS_STORAGE_KEY } from '../utils/pipelineSync';
+import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, StatIcon, IconButton, ActionButton, IconLabel, FormSelect, SearchField } from './shared';
 import type { LucideIcon } from 'lucide-react';
 import {
   ISODocument,
@@ -61,9 +63,10 @@ const emptyDocForm = {
   responsibleName: '',
   version: '1.0',
   description: '',
+  stageId: '',
 };
 
-const INITIAL_DOCUMENTS: ISODocument[] = [
+export const INITIAL_DOCUMENTS: ISODocument[] = [
     // === QUALITÉ & PILOTAGE ===
     {
       id: 'doc-1',
@@ -352,6 +355,7 @@ const INITIAL_DOCUMENTS: ISODocument[] = [
 
 export function DocumentationView() {
   const { matchesProject, activeProjectSlug } = useProjectContext();
+  const { scopedStages } = usePipeline();
   const [activeTab, setActiveTab] = useState<'library' | 'compliance' | 'links'>('library');
   const [filterCategory, setFilterCategory] = useState<DocumentCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -362,14 +366,20 @@ export function DocumentationView() {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('popilot:docs-local');
-      if (raw) setDocuments(JSON.parse(raw));
+      const raw = localStorage.getItem(DOCS_STORAGE_KEY);
+      if (raw) {
+        setDocuments(JSON.parse(raw));
+      } else {
+        setDocuments(INITIAL_DOCUMENTS);
+        localStorage.setItem(DOCS_STORAGE_KEY, JSON.stringify(INITIAL_DOCUMENTS));
+      }
     } catch {}
   }, []);
 
   useEffect(() => {
     try {
-      localStorage.setItem('popilot:docs-local', JSON.stringify(documents));
+      localStorage.setItem(DOCS_STORAGE_KEY, JSON.stringify(documents));
+      applyPipelineSync(undefined, documents);
     } catch {}
   }, [documents]);
 
@@ -386,7 +396,10 @@ export function DocumentationView() {
     createdAt: base?.createdAt ?? new Date().toISOString().slice(0, 10),
     updatedAt: new Date().toISOString().slice(0, 10),
     history: base?.history ?? [],
-    linkedTo: base?.linkedTo ?? { projectId: activeProjectSlug ?? 'popy' },
+    linkedTo: {
+      ...(base?.linkedTo ?? { projectId: activeProjectSlug ?? 'popy' }),
+      stageId: form.stageId || undefined,
+    },
     isCritical: base?.isCritical,
     validatedBy: base?.validatedBy,
     validatedAt: base?.validatedAt,
@@ -433,6 +446,7 @@ export function DocumentationView() {
       responsibleName: doc.responsibleName ?? '',
       version: doc.version,
       description: doc.description ?? '',
+      stageId: doc.linkedTo?.stageId ?? '',
     });
     setPageMode('edit');
   };
@@ -518,6 +532,17 @@ export function DocumentationView() {
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
           <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={4} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1">Étape pipeline liée</label>
+          <FormSelect value={form.stageId} onChange={(e) => setForm({ ...form, stageId: e.target.value })}>
+            <option value="">Aucune</option>
+            {scopedStages.map((stage) => (
+              <option key={stage.id} value={stage.id}>
+                {stage.order}. {stage.name}
+              </option>
+            ))}
+          </FormSelect>
         </div>
         <div className="flex gap-3">
           <button type="button" onClick={() => setPageMode(selectedDoc ? 'view' : 'list')} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg">Annuler</button>
@@ -734,21 +759,16 @@ export function DocumentationView() {
           {activeTab === 'library' && (
             <div className="space-y-6">
               {/* Filtres et recherche */}
-              <div className="flex gap-4">
-                <div className="flex-1 relative">
-                  <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Rechercher un document..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <select
+              <div className="filter-toolbar">
+                <SearchField
+                  wrapperClassName="filter-toolbar-grow"
+                  placeholder="Rechercher un document..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <FormSelect
                   value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value as any)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => setFilterCategory(e.target.value as DocumentCategory | 'all')}
                 >
                   <option value="all">Toutes les catégories</option>
                   <option value="feasibility">Études & Faisabilité</option>
@@ -758,7 +778,7 @@ export function DocumentationView() {
                   <option value="hr">Ressources Humaines</option>
                   <option value="quality">Qualité</option>
                   <option value="pilotage">Pilotage</option>
-                </select>
+                </FormSelect>
               </div>
 
               {/* Documents groupés par catégorie */}

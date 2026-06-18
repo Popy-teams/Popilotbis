@@ -3,6 +3,7 @@ import { Plus, Filter, MoreVertical, Calendar, User, AlertCircle } from 'lucide-
 import { useApi } from '../hooks/useApi';
 import { Task } from '../types';
 import { CreateTaskModal } from './CreateTaskModal';
+import { FormSelect } from './shared';
 
 export function TasksView() {
   const { data: tasks, loading, refetch } = useApi<Task[]>('/tasks');
@@ -57,32 +58,32 @@ export function TasksView() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3">
-        <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          <Filter className="w-4 h-4" />
+      <div className="filter-toolbar">
+        <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shrink-0">
+          <Filter className="w-4 h-4 shrink-0" />
           Filtrer
         </button>
-        <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <FormSelect>
           <option>Tous les statuts</option>
           <option>À faire</option>
           <option>En cours</option>
           <option>En revue</option>
           <option>Bloquée</option>
           <option>Terminée</option>
-        </select>
-        <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </FormSelect>
+        <FormSelect>
           <option>Toutes les priorités</option>
           <option>Haute</option>
           <option>Moyenne</option>
           <option>Basse</option>
-        </select>
-        <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </FormSelect>
+        <FormSelect>
           <option>Tous les projets</option>
           <option>Refonte plateforme digitale</option>
           <option>Migration infrastructure cloud</option>
           <option>Certification ISO 27001</option>
           <option>Application mobile interne</option>
-        </select>
+        </FormSelect>
       </div>
 
       {/* Stats */}

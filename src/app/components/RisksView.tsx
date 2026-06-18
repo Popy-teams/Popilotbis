@@ -42,9 +42,11 @@ import {
 } from '../types/risks';
 import { PageBackHeader } from './shared/PageBackHeader';
 import { useProjectContext } from '../context/ProjectContext';
+import { usePipeline } from '../context/PipelineContext';
+import { RISKS_STORAGE_KEY } from '../utils/pipelineSync';
 import { DEMO_RISKS_BY_PROJECT } from '../data/multiProjectDemoFixtures';
 import { mergeDemoData } from '../utils/demoDataMerge';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton } from './shared';
+import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton, FormSelect, SearchField } from './shared';
 
 type PageMode = 'list' | 'create' | 'view' | 'edit';
 
@@ -449,10 +451,12 @@ const emptyRiskForm = {
   probability: 3 as Risk['probability'],
   strategy: 'reduce' as Risk['strategy'],
   ownerName: 'Jean Dupont',
+  stageId: '',
 };
 
 export function RisksView() {
   const { matchesProject, activeProjectSlug } = useProjectContext();
+  const { scopedStages } = usePipeline();
   const [pageMode, setPageMode] = useState<PageMode>('list');
   const [activeTab, setActiveTab] = useState<'registry' | 'matrix' | 'suggestions' | 'indicators'>('registry');
   const [filterCategory, setFilterCategory] = useState<RiskCategory | 'all'>('all');
@@ -465,7 +469,7 @@ export function RisksView() {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('popilot:risks-local');
+      const raw = localStorage.getItem(RISKS_STORAGE_KEY);
       const saved = raw ? (JSON.parse(raw) as Risk[]) : [];
       setRisks(mergeDemoData(saved, DEMO_RISKS_BY_PROJECT, INITIAL_RISKS));
     } catch {}
@@ -473,7 +477,7 @@ export function RisksView() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('popilot:risks-local', JSON.stringify(risks));
+      localStorage.setItem(RISKS_STORAGE_KEY, JSON.stringify(risks));
     } catch {}
   }, [risks]);
 
@@ -558,7 +562,9 @@ export function RisksView() {
           description: 'Risque créé',
         },
       ],
-      linkedTo: base?.linkedTo,
+      linkedTo: form.stageId
+        ? { ...base?.linkedTo, stageId: form.stageId }
+        : base?.linkedTo,
       createdAt: base?.createdAt ?? now,
       updatedAt: now,
       tags: base?.tags,
@@ -606,6 +612,7 @@ export function RisksView() {
       probability: risk.probability,
       strategy: risk.strategy,
       ownerName: risk.ownerName ?? '',
+      stageId: risk.linkedTo?.stageId ?? '',
     });
     setPageMode('edit');
   };
@@ -634,14 +641,15 @@ export function RisksView() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
-            <div className="flex items-center gap-2">
-              <CategoryIcon category={form.category} />
-              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as RiskCategory })} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg">
-                {CATEGORY_CONFIG.filter((c) => c.id !== 'all').map((c) => (
-                  <option key={c.id} value={c.id}>{c.label}</option>
-                ))}
-              </select>
-            </div>
+            <FormSelect
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value as RiskCategory })}
+              leadingIconElement={<CategoryIcon category={form.category} />}
+            >
+              {CATEGORY_CONFIG.filter((c) => c.id !== 'all').map((c) => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </FormSelect>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
@@ -675,6 +683,17 @@ export function RisksView() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Propriétaire</label>
             <input value={form.ownerName} onChange={(e) => setForm({ ...form, ownerName: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Étape pipeline liée</label>
+            <FormSelect value={form.stageId} onChange={(e) => setForm({ ...form, stageId: e.target.value })}>
+              <option value="">Aucune</option>
+              {scopedStages.map((stage) => (
+                <option key={stage.id} value={stage.id}>
+                  {stage.order}. {stage.name}
+                </option>
+              ))}
+            </FormSelect>
           </div>
         </div>
         <div className="flex gap-3 pt-2">
@@ -873,47 +892,38 @@ export function RisksView() {
           {activeTab === 'registry' && (
             <div className="space-y-6">
               {/* Filtres */}
-              <div className="flex gap-4">
-                <div className="flex-1 relative">
-                  <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Rechercher un risque..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-                  />
-                </div>
-                <select
+              <div className="filter-toolbar">
+                <SearchField
+                  wrapperClassName="filter-toolbar-grow"
+                  placeholder="Rechercher un risque..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <FormSelect
                   value={filterType}
-                  onChange={(e) => setFilterType(e.target.value as any)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                  onChange={(e) => setFilterType(e.target.value as Risk['type'] | 'all')}
                 >
                   <option value="all">Tous types</option>
                   <option value="risk">Risques</option>
                   <option value="opportunity">Opportunités</option>
-                </select>
-                <div className="flex items-center gap-2">
-                  <SelectedCategoryIcon className="w-4 h-4 text-gray-600 shrink-0" />
-                  <select
-                    value={filterCategory}
-                    onChange={(e) => setFilterCategory(e.target.value as RiskCategory | 'all')}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-                  >
-                    {CATEGORY_CONFIG.map((c) => (
-                      <option key={c.id} value={c.id}>{c.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <select
+                </FormSelect>
+                <FormSelect
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value as RiskCategory | 'all')}
+                  leadingIconElement={<SelectedCategoryIcon className="w-4 h-4 text-gray-600" />}
+                >
+                  {CATEGORY_CONFIG.map((c) => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
+                </FormSelect>
+                <FormSelect
                   value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value as any)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                  onChange={(e) => setFilterStatus(e.target.value as Risk['status'] | 'all')}
                 >
                   <option value="all">Tous statuts</option>
                   <option value="open">Ouverts</option>
                   <option value="closed">Fermés</option>
-                </select>
+                </FormSelect>
               </div>
 
               {/* Liste des risques */}

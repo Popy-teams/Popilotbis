@@ -5,6 +5,7 @@ import { Project } from '../../types';
 import { ProjectDetailPage } from './components/ProjectDetailPage';
 import { ProjectFormPage } from './components/ProjectFormPage';
 import { ProjectsListPage } from './components/ProjectsListPage';
+import { computeProjectStatus, withEffectiveStatus } from './components/projectPresentation';
 import { createProject, deleteProject, initProjectsFixtures, updateProject } from './services/projectsService';
 
 type Mode = 'list' | 'create' | 'view' | 'edit';
@@ -14,7 +15,6 @@ type SortDirection = 'asc' | 'desc';
 const emptyForm = {
   name: '',
   description: '',
-  status: 'on-track' as Project['status'],
   priority: 'medium' as Project['priority'],
   startDate: '',
   deadline: '',
@@ -60,6 +60,11 @@ export function ProjectsFeature() {
     } catch {}
   }, [viewMode]);
 
+  const projectsWithStatus = useMemo(
+    () => visibleProjects.map(withEffectiveStatus),
+    [visibleProjects]
+  );
+
   const statusWeight: Record<Project['status'], number> = {
     'on-track': 1,
     'at-risk': 2,
@@ -69,7 +74,7 @@ export function ProjectsFeature() {
   };
 
   const sortedProjects = useMemo(() => {
-    const arr = [...visibleProjects];
+    const arr = [...projectsWithStatus];
     arr.sort((a, b) => {
       let cmp = 0;
       if (sortKey === 'deadline') {
@@ -82,7 +87,7 @@ export function ProjectsFeature() {
       return sortDirection === 'asc' ? cmp : -cmp;
     });
     return arr;
-  }, [visibleProjects, sortKey, sortDirection]);
+  }, [projectsWithStatus, sortKey, sortDirection]);
 
   const selectedMemberInitials = useMemo(
     () => members.filter((m) => form.selectedMembers.includes(m.id)).map((m) => m.initials),
@@ -100,14 +105,21 @@ export function ProjectsFeature() {
         .replace(/^-|-$/g, '')
         .slice(0, 32) || `projet-${Date.now()}`);
 
+    const progress = base?.progress ?? 0;
+    const status = computeProjectStatus({
+      deadline: form.deadline,
+      progress,
+      status: base?.status === 'archived' ? 'archived' : undefined,
+    });
+
     return {
       id: base?.id || `project:local-${Date.now()}`,
       name: form.name,
       slug,
       description: form.description,
-      status: form.status,
+      status,
       priority: form.priority,
-      progress: base?.progress ?? 0,
+      progress,
       startDate: form.startDate,
       deadline: form.deadline,
       budget: { total: parseInt(form.budgetTotal || '0', 10), used: base?.budget.used ?? 0 },
@@ -120,7 +132,7 @@ export function ProjectsFeature() {
   };
 
   const startCreate = () => {
-    setForm({ ...emptyForm, selectedMembers: [currentMemberId] });
+    setForm({ ...emptyForm, selectedMembers: currentMemberId ? [currentMemberId] : [] });
     setMode('create');
   };
 
@@ -129,7 +141,6 @@ export function ProjectsFeature() {
     setForm({
       name: p.name,
       description: p.description || '',
-      status: p.status,
       priority: p.priority,
       startDate: p.startDate || '',
       deadline: p.deadline,
@@ -189,10 +200,11 @@ export function ProjectsFeature() {
   if (mode === 'create') {
     return (
       <ProjectFormPage
-        title="Créer un projet"
+        title="Nouveau projet"
+        subtitle="Créez un projet"
         values={form}
         members={members}
-        submitLabel="Créer"
+        submitLabel="Créer le projet"
         onBack={() => setMode('list')}
         onChange={setForm}
         onSubmit={submitCreate}
@@ -203,9 +215,11 @@ export function ProjectsFeature() {
     return (
       <ProjectFormPage
         title="Modifier le projet"
+        subtitle={`Édition de « ${selected.name} »`}
         values={form}
         members={members}
-        submitLabel="Enregistrer"
+        submitLabel="Enregistrer les modifications"
+        progress={selected.progress}
         onBack={() => setMode('list')}
         onChange={setForm}
         onSubmit={submitEdit}
@@ -216,6 +230,7 @@ export function ProjectsFeature() {
     return (
       <ProjectDetailPage
         project={selected}
+        members={members}
         onBack={() => {
           setMode('list');
           setSelected(null);

@@ -1,4 +1,6 @@
 import { TEST_TASKS } from '../data/testData';
+import { INITIAL_PIPELINE } from '../data/initialPipeline';
+import { INITIAL_DOCUMENTS } from '../components/DocumentationView';
 import {
   DEMO_ALERTS_BY_PROJECT,
   DEMO_BOM_BY_PROJECT,
@@ -14,7 +16,7 @@ import {
 import { mergeDemoData } from './demoDataMerge';
 
 const SEED_VERSION_KEY = 'popilot:demo-seed-version';
-const CURRENT_SEED_VERSION = '2';
+const CURRENT_SEED_VERSION = '4';
 
 function mergeStorage<T extends { id: string | number }>(key: string, incoming: T[]) {
   if (incoming.length === 0) return;
@@ -39,7 +41,8 @@ export function seedMultiProjectDemoData() {
     mergeStorage('popilot:tasks-local', [...TEST_TASKS, ...DEMO_TASKS_BY_PROJECT]);
     mergeStorage('popilot:risks-local', DEMO_RISKS_BY_PROJECT);
     mergeStorage('popilot:meetings-local', DEMO_MEETINGS_BY_PROJECT);
-    mergeStorage('popilot:pipeline-local', DEMO_PIPELINE_BY_PROJECT);
+    mergeStorage('popilot:pipeline-local', [...INITIAL_PIPELINE, ...DEMO_PIPELINE_BY_PROJECT]);
+    mergeStorage('popilot:docs-local', INITIAL_DOCUMENTS);
     mergeStorage('popilot:veille-local', DEMO_VEILLE_BY_PROJECT);
     mergeStorage('popilot:marketing-local', DEMO_MARKETING_BY_PROJECT);
     mergeStorage('popilot:satisfaction-local', DEMO_SATISFACTION_BY_PROJECT);

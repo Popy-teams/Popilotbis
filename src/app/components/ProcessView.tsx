@@ -20,24 +20,15 @@ import {
   Clock,
   AlertTriangle,
   Pencil,
-  Save,
 } from 'lucide-react';
 import { PageBackHeader } from './shared/PageBackHeader';
 import { TEST_PROCESSES, ProcessData } from '../data/testProcesses';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton } from './shared';
+import { ViewShell, ViewHeader, AppIcon, ActionButton } from './shared';
+import { ProcessFormPage } from './process/ProcessFormPage';
 
 type PageMode = 'list' | 'create' | 'view' | 'edit';
 
 type ProcessType = ProcessData['type'];
-type ProcessStatus = ProcessData['status'];
-
-const emptyForm = {
-  title: '',
-  objective: '',
-  type: 'pilotage' as ProcessType,
-  responsible: '',
-  status: 'todo' as ProcessStatus,
-};
 
 export function ProcessView() {
   const { activeProject, activeProjectSlug, matchesProject } = useProjectContext();
@@ -45,7 +36,7 @@ export function ProcessView() {
   const [selectedProcess, setSelectedProcess] = useState<ProcessData | null>(null);
   const [processes, setProcesses] = useState<ProcessData[]>([]);
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string | null>(null);
-  const [form, setForm] = useState(emptyForm);
+  const [createType, setCreateType] = useState<ProcessType>('pilotage');
 
   useEffect(() => {
     if (activeProject) {
@@ -103,20 +94,13 @@ export function ProcessView() {
   };
 
   const openCreate = (type?: ProcessType) => {
-    setForm({ ...emptyForm, type: type ?? 'pilotage' });
+    setCreateType(type ?? 'pilotage');
     setSelectedProcess(null);
     setPageMode('create');
   };
 
   const openEdit = (process: ProcessData) => {
     setSelectedProcess(process);
-    setForm({
-      title: process.title,
-      objective: process.objective,
-      type: process.type,
-      responsible: process.responsible,
-      status: process.status,
-    });
     setPageMode('edit');
   };
 
@@ -125,36 +109,7 @@ export function ProcessView() {
     setPageMode('view');
   };
 
-  const submitForm = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeProject) return;
-
-    const base = pageMode === 'edit' && selectedProcess ? selectedProcess : null;
-    const steps = base?.steps ?? [{ id: '1', title: 'Étape initiale', description: '', status: 'todo' as const }];
-    const progress = form.status === 'done' ? 100 : form.status === 'in-progress' ? 50 : calcProgress(steps);
-
-    const next: ProcessData = {
-      id: base?.id ?? `process-${Date.now()}`,
-      projectId: activeProjectSlug ?? activeProject.id,
-      type: form.type,
-      title: form.title,
-      objective: form.objective,
-      responsible: form.responsible,
-      status: form.status,
-      trigger: base?.trigger,
-      contributors: base?.contributors ?? [],
-      steps,
-      deliverables: base?.deliverables ?? [],
-      validationCriteria: base?.validationCriteria ?? [],
-      risks: base?.risks ?? [],
-      improvementLink: base?.improvementLink,
-      assignedTo: base?.assignedTo,
-      linkedTasks: base?.linkedTasks,
-      progress,
-      createdAt: base?.createdAt ?? new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
+  const handleSaveProcess = (next: ProcessData) => {
     if (pageMode === 'create') {
       setProcesses((prev) => [...prev, next]);
       setPageMode('list');
@@ -163,89 +118,21 @@ export function ProcessView() {
       setSelectedProcess(next);
       setPageMode('view');
     }
-    setForm(emptyForm);
   };
 
-  const processFormPage = (
-    <ViewShell narrow>
-      <PageBackHeader
-        title={pageMode === 'create' ? 'Créer un processus' : 'Modifier le processus'}
-        subtitle={activeProject?.name}
-        onBack={() => setPageMode(pageMode === 'edit' && selectedProcess ? 'view' : 'list')}
+  if ((pageMode === 'create' || pageMode === 'edit') && activeProject) {
+    return (
+      <ProcessFormPage
+        mode={pageMode}
+        projectId={activeProjectSlug ?? activeProject.id}
+        projectName={activeProject.name}
+        defaultType={createType}
+        initial={pageMode === 'edit' ? selectedProcess : null}
+        onSubmit={handleSaveProcess}
+        onCancel={() => setPageMode(pageMode === 'edit' && selectedProcess ? 'view' : 'list')}
       />
-      <form onSubmit={submitForm} className="bg-white rounded-xl border border-gray-200 p-6 space-y-4 shadow-sm">
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1">Titre *</label>
-          <input
-            required
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1">Objectif *</label>
-          <textarea
-            required
-            rows={3}
-            value={form.objective}
-            onChange={(e) => setForm({ ...form, objective: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Type *</label>
-            <select
-              value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value as ProcessType })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-            >
-              {processTypes.map((t) => (
-                <option key={t.type} value={t.type}>{t.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Statut *</label>
-            <select
-              value={form.status}
-              onChange={(e) => setForm({ ...form, status: e.target.value as ProcessStatus })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value="todo">À faire</option>
-              <option value="in-progress">En cours</option>
-              <option value="done">Terminé</option>
-            </select>
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1">Responsable *</label>
-          <input
-            required
-            value={form.responsible}
-            onChange={(e) => setForm({ ...form, responsible: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <div className="flex gap-3 pt-2">
-          <button
-            type="button"
-            onClick={() => setPageMode(pageMode === 'edit' && selectedProcess ? 'view' : 'list')}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            Annuler
-          </button>
-          <button type="submit" className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2">
-            <Save className="w-4 h-4" />
-            {pageMode === 'create' ? 'Créer' : 'Enregistrer'}
-          </button>
-        </div>
-      </form>
-    </ViewShell>
-  );
-
-  if ((pageMode === 'create' || pageMode === 'edit') && activeProject) return processFormPage;
+    );
+  }
 
   if (pageMode === 'view' && selectedProcess && activeProject) {
     const process = selectedProcess;
@@ -428,6 +315,29 @@ export function ProcessView() {
                 </div>
               </div>
             )}
+
+            {process.validationCriteria.length > 0 && (
+              <div className="bg-white rounded-lg border border-blue-200">
+                <div className="bg-blue-50 px-5 py-3 border-b border-blue-200">
+                  <h3 className="font-semibold text-blue-900 flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5" />
+                    Critères de validation
+                  </h3>
+                </div>
+                <div className="p-5 space-y-2">
+                  {process.validationCriteria.map((criterion, idx) => (
+                    <div key={idx} className="text-sm text-gray-700">{idx + 1}. {criterion}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {process.improvementLink ? (
+              <div className="bg-white rounded-lg border border-purple-200 p-5">
+                <h3 className="font-semibold text-purple-900 mb-1">Lien amélioration continue</h3>
+                <p className="text-sm text-gray-700">{process.improvementLink}</p>
+              </div>
+            ) : null}
 
             {process.risks.length > 0 && (
               <div className="bg-white rounded-lg border border-orange-200">

@@ -30,7 +30,7 @@ import {
   Video,
 } from 'lucide-react';
 import { PageBackHeader } from './shared/PageBackHeader';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton } from './shared';
+import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton, FormSelect, SearchField } from './shared';
 import {
   BOMComponent,
   Quote,
@@ -958,21 +958,16 @@ export function BudgetView() {
         <div>
           {/* Filtres et recherche */}
           <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-            <div className="flex items-center gap-4">
-              <div className="flex-1 relative">
-                <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Rechercher un composant..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
-              </div>
-              <select
+            <div className="filter-toolbar">
+              <SearchField
+                wrapperClassName="filter-toolbar-grow"
+                placeholder="Rechercher un composant..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <FormSelect
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value as BOMCategory | 'all')}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
                 <option value="all">Toutes les catégories</option>
                 {categories.map((cat) => (
@@ -980,11 +975,10 @@ export function BudgetView() {
                     {getBOMCategoryLabel(cat)}
                   </option>
                 ))}
-              </select>
-              <select
+              </FormSelect>
+              <FormSelect
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value as ComponentStatus | 'all')}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
                 <option value="all">Tous les statuts</option>
                 <option value="to-quote">À chiffrer</option>
@@ -993,7 +987,7 @@ export function BudgetView() {
                 <option value="validated">Validé</option>
                 <option value="ordered">Commandé</option>
                 <option value="received">Reçu</option>
-              </select>
+              </FormSelect>
             </div>
           </div>
 

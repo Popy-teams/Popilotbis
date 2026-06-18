@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import {
   Plus,
   Filter,
@@ -18,9 +19,12 @@ import { TEST_TASKS, TEST_TEAM_MEMBERS, calculateTaskProgress, type TestTask } f
 import { DEMO_TASKS_BY_PROJECT } from '../data/multiProjectDemoFixtures';
 import { mergeDemoData } from '../utils/demoDataMerge';
 import { useProjectContext } from '../context/ProjectContext';
+import { usePipeline } from '../context/PipelineContext';
+import { linkTaskToPipelineStage, TASKS_STORAGE_KEY, applyPipelineSync, removeTaskFromPipeline } from '../utils/pipelineSync';
+import { getRoutePath } from '../routes/viewRoutes';
 import { PageBackHeader } from './shared/PageBackHeader';
 import { PriorityBadge, TaskStatusBadge, TestModeBadge } from './shared/displayHelpers';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton } from './shared';
+import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton, FormSelect } from './shared';
 
 type PageMode = 'list' | 'create' | 'view' | 'edit';
 
@@ -31,10 +35,13 @@ const emptyForm = {
   priority: 'medium' as TestTask['priority'],
   assignedTo: TEST_TEAM_MEMBERS[0]?.id ?? '',
   dueDate: '',
+  stageId: '',
 };
 
 export function TasksViewWithTestData() {
+  const navigate = useNavigate();
   const { activeProject, activeProjectSlug, matchesProject } = useProjectContext();
+  const { scopedStages, syncFromTasks } = usePipeline();
   const [pageMode, setPageMode] = useState<PageMode>('list');
   const [tasks, setTasks] = useState<TestTask[]>(TEST_TASKS);
   const [selectedTask, setSelectedTask] = useState<TestTask | null>(null);
@@ -74,25 +81,36 @@ export function TasksViewWithTestData() {
     subtasks: base?.subtasks ?? [],
     linkedToProcesses: base?.linkedToProcesses,
     linkedToProcessSteps: base?.linkedToProcessSteps,
+    stageId: form.stageId || undefined,
   });
 
   const memberName = (id: string) => TEST_TEAM_MEMBERS.find((m) => m.id === id)?.name ?? id;
 
+  const persistTasks = (nextTasks: TestTask[]) => {
+    try {
+      localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(nextTasks));
+    } catch {
+      // ignore
+    }
+    applyPipelineSync(nextTasks);
+    syncFromTasks(nextTasks);
+    setTasks(nextTasks);
+  };
+
   const submitForm = (e: React.FormEvent) => {
     e.preventDefault();
     const next = toTask(pageMode === 'edit' ? selectedTask ?? undefined : undefined);
-    if (pageMode === 'create') {
-      setTasks((prev) => [next, ...prev]);
-    } else {
-      setTasks((prev) => prev.map((t) => (t.id === next.id ? next : t)));
-      setSelectedTask(next);
-    }
+    const baseTasks =
+      pageMode === 'create' ? [next, ...tasks] : tasks.map((t) => (t.id === next.id ? next : t));
+    const syncedTasks = linkTaskToPipelineStage(next.id, next.stageId, baseTasks);
+    persistTasks(syncedTasks);
+    if (pageMode === 'edit') setSelectedTask(next);
     setPageMode('list');
     setForm(emptyForm);
   };
 
   const removeTask = (id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    persistTasks(removeTaskFromPipeline(id, tasks));
     setSelectedTask(null);
     setPageMode('list');
   };
@@ -143,6 +161,23 @@ export function TasksViewWithTestData() {
             <label className="block text-sm font-semibold text-gray-700 mb-1">Echeance *</label>
             <input type="date" required value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
           </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Étape pipeline</label>
+            <FormSelect
+              value={form.stageId}
+              onChange={(e) => setForm({ ...form, stageId: e.target.value })}
+            >
+              <option value="">Aucune étape</option>
+              {scopedStages.map((stage) => (
+                <option key={stage.id} value={stage.id}>
+                  {stage.order}. {stage.name}
+                </option>
+              ))}
+            </FormSelect>
+            <p className="text-xs text-gray-500 mt-1">
+              La progression de l&apos;étape est recalculée automatiquement selon les tâches liées.
+            </p>
+          </div>
         </div>
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={() => setPageMode(selectedTask ? 'view' : 'list')} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Annuler</button>
@@ -165,7 +200,7 @@ export function TasksViewWithTestData() {
           onBack={() => { setPageMode('list'); setSelectedTask(null); }}
           actions={
             <div className="flex gap-2">
-              <button type="button" onClick={() => { setForm({ title: task.title, description: task.description, status: task.status, priority: task.priority, assignedTo: task.assignedTo, dueDate: task.dueDate }); setPageMode('edit'); }} className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+              <button type="button" onClick={() => { setForm({ title: task.title, description: task.description, status: task.status, priority: task.priority, assignedTo: task.assignedTo, dueDate: task.dueDate, stageId: task.stageId ?? '' }); setPageMode('edit'); }} className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
                 <Pencil className="w-4 h-4" /> Modifier
               </button>
               <button type="button" onClick={() => removeTask(task.id)} className="inline-flex items-center gap-2 px-4 py-2 border border-red-200 text-red-700 rounded-lg hover:bg-red-50">
@@ -183,6 +218,18 @@ export function TasksViewWithTestData() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div className="flex items-center gap-2 text-gray-700"><User className="w-4 h-4" />{task.assignedToName}</div>
             <div className="flex items-center gap-2 text-gray-700"><Calendar className="w-4 h-4" />{new Date(task.dueDate).toLocaleDateString('fr-FR')}</div>
+            {task.stageId ? (
+              <div className="md:col-span-2">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/${getRoutePath('pipeline')}`)}
+                  className="inline-flex items-center gap-2 text-sm text-purple-700 hover:text-purple-900"
+                >
+                  <FolderKanban className="w-4 h-4" />
+                  Étape pipeline : {scopedStages.find((s) => s.id === task.stageId)?.name ?? task.stageId}
+                </button>
+              </div>
+            ) : null}
           </div>
           <div>
             <div className="flex justify-between text-sm mb-1"><span>Progression</span><span className="font-bold">{progress}%</span></div>
@@ -234,22 +281,22 @@ export function TasksViewWithTestData() {
         }
       />
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <span className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-600"><Filter className="w-4 h-4" />Filtres</span>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-lg">
+      <div className="filter-toolbar">
+        <span className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-600 shrink-0"><Filter className="w-4 h-4 shrink-0" />Filtres</span>
+        <FormSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="all">Tous les statuts</option>
           <option value="todo">A faire</option>
           <option value="in-progress">En cours</option>
           <option value="blocked">Bloquee</option>
           <option value="done">Terminee</option>
-        </select>
-        <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-lg">
+        </FormSelect>
+        <FormSelect value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
           <option value="all">Toutes les priorites</option>
           <option value="high">Haute</option>
           <option value="medium">Moyenne</option>
           <option value="low">Basse</option>
-        </select>
-        <div className="ml-auto text-sm text-gray-600">{filteredTasks.length} tache(s)</div>
+        </FormSelect>
+        <div className="sm:ml-auto text-sm text-gray-600 shrink-0">{filteredTasks.length} tache(s)</div>
       </div>
 
       <div className="space-y-3">

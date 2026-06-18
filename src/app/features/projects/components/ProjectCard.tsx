@@ -1,6 +1,6 @@
 import { Archive, Calendar, Edit2, Target, Trash2, Users } from 'lucide-react';
 import { Project } from '../../../types';
-import { getPriorityBadge, getStatusColor, getStatusLabel } from './projectPresentation';
+import { getPriorityBadge, getStatusColor, getStatusLabel, withEffectiveStatus } from './projectPresentation';
 
 interface ProjectCardProps {
   project: Project;
@@ -10,7 +10,8 @@ interface ProjectCardProps {
   onDelete: (p: Project) => void;
 }
 
-export function ProjectCard({ project, onOpen, onEdit, onArchive, onDelete }: ProjectCardProps) {
+export function ProjectCard({ project: rawProject, onOpen, onEdit, onArchive, onDelete }: ProjectCardProps) {
+  const project = withEffectiveStatus(rawProject);
   const priority = getPriorityBadge(project.priority);
   const PriorityIcon = priority.icon;
 

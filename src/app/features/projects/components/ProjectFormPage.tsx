@@ -1,6 +1,29 @@
-import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { useMemo } from 'react';
+import {
+  Calendar,
+  DollarSign,
+  Eye,
+  EyeOff,
+  FileText,
+  Sparkles,
+  Target,
+  Users,
+} from 'lucide-react';
 import { Project } from '../../../types';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton } from '../../../components/shared';
+import {
+  ViewShell,
+  PageBackHeader,
+  ActionButton,
+  AppIcon,
+  viewGrids,
+} from '../../../components/shared';
+import {
+  computeProjectStatus,
+  getPriorityBadge,
+  getStatusColor,
+  getStatusHint,
+  getStatusLabel,
+} from './projectPresentation';
 
 interface MemberOption {
   id: string;
@@ -8,10 +31,9 @@ interface MemberOption {
   initials: string;
 }
 
-interface ProjectFormValues {
+export interface ProjectFormValues {
   name: string;
   description: string;
-  status: Project['status'];
   priority: Project['priority'];
   startDate: string;
   deadline: string;
@@ -22,23 +44,40 @@ interface ProjectFormValues {
 
 interface ProjectFormPageProps {
   title: string;
+  subtitle: string;
   values: ProjectFormValues;
   members: MemberOption[];
   submitLabel: string;
+  progress?: number;
   onBack: () => void;
   onChange: (values: ProjectFormValues) => void;
   onSubmit: (e: React.FormEvent) => void;
 }
 
+const inputClass =
+  'w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10';
+
+const labelClass = 'block text-sm font-medium text-slate-700 mb-1.5';
+
 export function ProjectFormPage({
   title,
+  subtitle,
   values,
   members,
   submitLabel,
+  progress = 0,
   onBack,
   onChange,
   onSubmit,
 }: ProjectFormPageProps) {
+  const previewStatus = useMemo(
+    () =>
+      values.deadline
+        ? computeProjectStatus({ deadline: values.deadline, progress })
+        : null,
+    [values.deadline, progress]
+  );
+
   const toggleMember = (memberId: string) => {
     const selectedMembers = values.selectedMembers.includes(memberId)
       ? values.selectedMembers.filter((id) => id !== memberId)
@@ -48,122 +87,240 @@ export function ProjectFormPage({
 
   return (
     <ViewShell>
-      <div className="flex items-start sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">{title}</h1>
-          <p className="text-slate-600 mt-1">Page CRUD Portfolio Projet</p>
-        </div>
-        <button onClick={onBack} className="p-2 border border-slate-300 rounded-lg hover:bg-slate-50 shrink-0" aria-label="Retour">
-          <AppIcon icon={ArrowLeft} size="sm" />
-        </button>
-      </div>
+      <PageBackHeader title={title} subtitle={subtitle} onBack={onBack} />
 
-      <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 space-y-5 shadow-sm">
-        <div className="rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3">
-          <p className="text-sm text-blue-800">
-            Renseigne les informations clefs du projet. Tu pourras ensuite modifier ces donnees a tout moment.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-slate-700 mb-1">Nom du projet *</label>
-            <input type="text" required value={values.name} onChange={(e) => onChange({ ...values, name: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200" />
+      <form onSubmit={onSubmit} className="space-y-6">
+        {/* Statut automatique */}
+        {previewStatus && (
+          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 sm:p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                  <AppIcon icon={Sparkles} size="sm" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Statut calculé automatiquement</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Basé sur la date d&apos;échéance{progress > 0 ? ' et l&apos;avancement' : ''} — non modifiable manuellement
+                  </p>
+                </div>
+              </div>
+              <span className={`saas-badge ${getStatusColor(previewStatus)} self-start sm:self-center`}>
+                {getStatusLabel(previewStatus)}
+              </span>
+            </div>
+            {values.deadline && (
+              <p className="mt-3 text-xs text-slate-600 border-t border-slate-100 pt-3">
+                {getStatusHint(previewStatus, values.deadline)}
+              </p>
+            )}
           </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-slate-700 mb-1">Description *</label>
-            <textarea required rows={3} value={values.description} onChange={(e) => onChange({ ...values, description: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Statut *</label>
-            <select value={values.status} onChange={(e) => onChange({ ...values, status: e.target.value as Project['status'] })} className="w-full px-3 pr-10 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200">
-              <option value="on-track">Dans les temps</option>
-              <option value="at-risk">A risque</option>
-              <option value="delayed">En retard</option>
-              <option value="archived">Archive</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Priorite *</label>
-            <select value={values.priority} onChange={(e) => onChange({ ...values, priority: e.target.value as Project['priority'] })} className="w-full px-3 pr-10 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200">
-              <option value="high">Haute</option>
-              <option value="medium">Moyenne</option>
-              <option value="low">Basse</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Date de debut</label>
-            <input type="date" value={values.startDate} onChange={(e) => onChange({ ...values, startDate: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Date d'echeance *</label>
-            <input type="date" required value={values.deadline} onChange={(e) => onChange({ ...values, deadline: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200" />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-slate-700 mb-1">Budget total (EUR) *</label>
-            <input type="number" required min="0" value={values.budgetTotal} onChange={(e) => onChange({ ...values, budgetTotal: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200" />
-          </div>
-        </div>
+        )}
 
-        <div className="rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-4 space-y-3">
-          <div className="flex items-start justify-between gap-3">
+        {/* Informations générales */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm space-y-5">
+          <div className="flex items-center gap-3 pb-1 border-b border-slate-100">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+              <AppIcon icon={Target} size="sm" />
+            </div>
             <div>
-              <p className="text-sm font-semibold text-violet-900 flex items-center gap-2">
+              <h2 className="font-semibold text-slate-900">Informations générales</h2>
+              <p className="text-xs text-slate-500">Identité et description du projet</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className={labelClass} htmlFor="project-name">
+                Nom du projet *
+              </label>
+              <input
+                id="project-name"
+                type="text"
+                required
+                value={values.name}
+                onChange={(e) => onChange({ ...values, name: e.target.value })}
+                className={inputClass}
+                placeholder="Ex. Popy — Assistant vocal"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={labelClass} htmlFor="project-description">
+                Description *
+              </label>
+              <textarea
+                id="project-description"
+                required
+                rows={4}
+                value={values.description}
+                onChange={(e) => onChange({ ...values, description: e.target.value })}
+                className={inputClass}
+                placeholder="Objectifs, périmètre et livrables attendus…"
+              />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="project-priority">
+                Priorité *
+              </label>
+              <select
+                id="project-priority"
+                value={values.priority}
+                onChange={(e) => onChange({ ...values, priority: e.target.value as Project['priority'] })}
+                className={inputClass}
+              >
+                <option value="high">Élevée</option>
+                <option value="medium">Moyenne</option>
+                <option value="low">Basse</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        {/* Planning & budget */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm space-y-5">
+          <div className="flex items-center gap-3 pb-1 border-b border-slate-100">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+              <AppIcon icon={Calendar} size="sm" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-slate-900">Planning & budget</h2>
+              <p className="text-xs text-slate-500">Dates clés et enveloppe financière</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass} htmlFor="project-start">
+                Date de début
+              </label>
+              <input
+                id="project-start"
+                type="date"
+                value={values.startDate}
+                onChange={(e) => onChange({ ...values, startDate: e.target.value })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="project-deadline">
+                Date d&apos;échéance *
+              </label>
+              <input
+                id="project-deadline"
+                type="date"
+                required
+                value={values.deadline}
+                onChange={(e) => onChange({ ...values, deadline: e.target.value })}
+                className={inputClass}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={labelClass} htmlFor="project-budget">
+                Budget total (EUR) *
+              </label>
+              <div className="relative">
+                <AppIcon
+                  icon={DollarSign}
+                  size="sm"
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                />
+                <input
+                  id="project-budget"
+                  type="number"
+                  required
+                  min="0"
+                  value={values.budgetTotal}
+                  onChange={(e) => onChange({ ...values, budgetTotal: e.target.value })}
+                  className={`${inputClass} pl-10`}
+                  placeholder="120000"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Visibilité */}
+        <section className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50/80 to-white p-4 sm:p-6 shadow-sm space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
                 <AppIcon icon={values.isRestricted ? EyeOff : Eye} size="sm" />
-                Visibilité du projet
-              </p>
-              <p className="text-xs text-violet-700 mt-1">
-                {values.isRestricted
-                  ? 'Seuls les participants sélectionnés (et les administrateurs) peuvent voir ce projet.'
-                  : 'Tous les utilisateurs connectés peuvent voir ce projet.'}
-              </p>
+              </div>
+              <div>
+                <h2 className="font-semibold text-violet-950">Visibilité du projet</h2>
+                <p className="text-xs text-violet-700 mt-0.5 max-w-md">
+                  {values.isRestricted
+                    ? 'Seuls les participants sélectionnés et les administrateurs voient ce projet.'
+                    : 'Tous les utilisateurs connectés peuvent consulter ce projet.'}
+                </p>
+              </div>
             </div>
             <button
               type="button"
               onClick={() => onChange({ ...values, isRestricted: !values.isRestricted })}
-              className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${
+              className={`relative shrink-0 w-12 h-7 rounded-full transition-colors ${
                 values.isRestricted ? 'bg-violet-600' : 'bg-slate-300'
               }`}
               aria-label="Restreindre la visibilité"
             >
               <span
-                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
                   values.isRestricted ? 'translate-x-5' : ''
                 }`}
               />
             </button>
           </div>
-        </div>
+        </section>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Participants {values.isRestricted ? '(visibilité + équipe)' : "(équipe)"}
-          </label>
-          <p className="text-xs text-slate-500 mb-2">
-            Sélectionnez les membres concernés par ce projet.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {members.map((member) => (
-              <button
-                key={member.id}
-                type="button"
-                onClick={() => toggleMember(member.id)}
-                className={`px-3 py-2.5 rounded-xl border text-sm text-left transition-colors ${
-                  values.selectedMembers.includes(member.id) ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                {member.name} ({member.initials})
-              </button>
-            ))}
+        {/* Équipe */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm space-y-4">
+          <div className="flex items-center gap-3 pb-1 border-b border-slate-100">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+              <AppIcon icon={Users} size="sm" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-slate-900">
+                Participants {values.isRestricted ? '(visibilité + équipe)' : '(équipe)'}
+              </h2>
+              <p className="text-xs text-slate-500">Membres impliqués dans le projet</p>
+            </div>
           </div>
-        </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {members.map((member) => {
+              const selected = values.selectedMembers.includes(member.id);
+              return (
+                <button
+                  key={member.id}
+                  type="button"
+                  onClick={() => toggleMember(member.id)}
+                  className={`flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-all ${
+                    selected
+                      ? 'border-indigo-400 bg-indigo-50/80 text-indigo-900 shadow-sm ring-1 ring-indigo-200'
+                      : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <span
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      selected ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'
+                    }`}
+                  >
+                    {member.initials}
+                  </span>
+                  <span className="text-sm font-medium truncate">{member.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
         <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
-          <button type="button" onClick={onBack} className="px-4 py-2 border border-slate-300 rounded-xl hover:bg-slate-50">
+          <ActionButton type="button" variant="secondary" onClick={onBack} className="!rounded-xl !py-3">
             Annuler
-          </button>
-          <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-sm">
+          </ActionButton>
+          <ActionButton type="submit" variant="primary" icon={FileText} className="!rounded-xl !py-3 !shadow-lg !shadow-indigo-500/20">
             {submitLabel}
-          </button>
+          </ActionButton>
         </div>
       </form>
     </ViewShell>

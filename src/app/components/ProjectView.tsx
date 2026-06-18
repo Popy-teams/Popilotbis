@@ -3,6 +3,7 @@ import { Plus, Calendar, Users as UsersIcon, DollarSign, Edit2, Trash2, Archive,
 import { useApi, apiDelete, apiPost, apiPut } from '../hooks/useApi';
 import { Project } from '../types';
 import { PORTFOLIO_PROJECT_FIXTURES } from '../data/portfolioProjectsFixtures';
+import { FormSelect } from './shared';
 
 type ProjectPageMode = 'list' | 'create' | 'view' | 'edit';
 
@@ -516,14 +517,14 @@ export function ProjectView() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 pr-1 sm:pr-0">
-        <select className="w-full sm:w-auto min-h-10 px-4 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+      <div className="filter-toolbar">
+        <FormSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} wrapperClassName="w-full sm:w-auto sm:min-w-[12rem]">
           <option value="all">Tous les statuts</option>
           <option value="on-track">Dans les temps</option>
           <option value="at-risk">À risque</option>
           <option value="delayed">En retard</option>
           <option value="archived">Archive</option>
-        </select>
+        </FormSelect>
         {statusFilter !== 'all' && (
           <div className="flex items-center justify-between sm:justify-start gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-sm">
             <span className="text-blue-700 font-medium">{filteredProjects.length} projet{filteredProjects.length > 1 ? 's' : ''}</span>

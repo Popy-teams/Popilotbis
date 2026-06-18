@@ -1,4 +1,5 @@
-import { ArrowDownUp, LayoutGrid, List, Plus, Search } from 'lucide-react';
+import { ArrowDownUp, LayoutGrid, List, Plus } from 'lucide-react';
+import { FormSelect, SearchField } from '../../../components/shared';
 
 interface ProjectsToolbarProps {
   query: string;
@@ -54,14 +55,18 @@ export function ProjectsToolbar({
 
       <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto_auto_auto] gap-2">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 flex items-center gap-2">
-            <Search className="w-4 h-4 text-slate-400 shrink-0" />
-            <input value={query} onChange={(e) => onQueryChange(e.target.value)} placeholder="Rechercher un projet..." className="w-full min-h-10 px-2 py-2 text-sm bg-transparent outline-none" />
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 min-w-0">
+            <SearchField
+              value={query}
+              onChange={(e) => onQueryChange(e.target.value)}
+              placeholder="Rechercher un projet..."
+              className="border-0 bg-transparent shadow-none focus:shadow-none min-h-10"
+            />
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-2 flex items-center">
-            <select className="w-full min-h-10 px-3 pr-10 py-2 border border-slate-300 rounded-lg text-sm bg-white" value={statusFilter} onChange={(e) => onStatusFilterChange(e.target.value)}>
-              <option value="all">Tous statuts</option><option value="on-track">Dans les temps</option><option value="at-risk">A risque</option><option value="delayed">En retard</option><option value="archived">Archive</option>
-            </select>
+          <div className="rounded-xl border border-slate-200 bg-white p-2 min-w-0">
+            <FormSelect value={statusFilter} onChange={(e) => onStatusFilterChange(e.target.value)}>
+              <option value="all">Tous statuts</option><option value="on-track">Dans les temps</option><option value="at-risk">À risque</option><option value="delayed">En retard</option><option value="completed">Terminé</option><option value="archived">Archivé</option>
+            </FormSelect>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-2 flex items-center justify-center gap-1">
             <button onClick={() => onViewModeChange('cards')} className={`min-h-10 px-3 rounded-lg text-sm inline-flex items-center gap-2 ${viewMode === 'cards' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}><LayoutGrid className="w-4 h-4" /> Cartes</button>

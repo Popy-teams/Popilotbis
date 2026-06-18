@@ -180,6 +180,178 @@
     border-color: var(--saas-primary);
   }
 
+  /* Listes déroulantes — icônes et chevron responsives */
+  .form-select-wrap {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .form-select-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    z-index: 1;
+    color: #64748b;
+  }
+
+  .form-select-chevron {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    width: 1rem;
+    height: 1rem;
+    color: #64748b;
+    flex-shrink: 0;
+  }
+
+  @media (min-width: 640px) {
+    .form-select-chevron {
+      width: 1.125rem;
+      height: 1.125rem;
+    }
+  }
+
+  .form-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 100%;
+    min-width: 0;
+    min-height: 2.5rem;
+    padding: 0.5rem 2.5rem 0.5rem 1rem;
+    border: 1px solid var(--saas-border);
+    border-radius: var(--saas-radius-md);
+    background-color: #fff;
+    background-image: none;
+    color: var(--saas-text);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    cursor: pointer;
+  }
+
+  .form-select-with-icon {
+    padding-left: 2.5rem;
+  }
+
+  .form-select-sm {
+    min-height: 2.25rem;
+    font-size: 0.8125rem;
+  }
+
+  .form-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+    border-color: var(--saas-primary);
+  }
+
+  .form-select-wrap .form-select {
+    background-image: none;
+  }
+
+  /* Style automatique des <select> natifs dans les vues */
+  .view-shell select:not(.form-select),
+  header select:not(.form-select),
+  .filter-toolbar select:not(.form-select),
+  form select:not(.form-select) {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 100%;
+    min-width: 0;
+    min-height: 2.5rem;
+    padding: 0.5rem 2.5rem 0.5rem 1rem;
+    border: 1px solid var(--saas-border);
+    border-radius: var(--saas-radius-md);
+    background-color: #fff;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem 1rem;
+    color: var(--saas-text);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    cursor: pointer;
+  }
+
+  .view-shell select:not(.form-select):focus,
+  header select:not(.form-select):focus,
+  .filter-toolbar select:not(.form-select):focus,
+  form select:not(.form-select):focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+    border-color: var(--saas-primary);
+  }
+
+  /* Barre de filtres responsive */
+  .filter-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+    min-width: 0;
+  }
+
+  @media (min-width: 640px) {
+    .filter-toolbar {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: stretch;
+    }
+
+    .filter-toolbar > .filter-toolbar-grow {
+      flex: 1 1 12rem;
+      min-width: 0;
+    }
+
+    .filter-toolbar > .form-select-wrap,
+    .filter-toolbar > select:not(.form-select) {
+      flex: 1 1 10rem;
+      width: auto;
+      min-width: 10rem;
+    }
+  }
+
+  /* Champ recherche avec icône */
+  .search-field-wrap {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .search-field-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: #94a3b8;
+    z-index: 1;
+  }
+
+  .search-field {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.5rem;
+    padding: 0.5rem 1rem 0.5rem 2.5rem;
+    border: 1px solid var(--saas-border);
+    border-radius: var(--saas-radius-md);
+    background: #fff;
+    color: var(--saas-text);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .search-field:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+    border-color: var(--saas-primary);
+  }
+
   .saas-badge {
     display: inline-flex;
     align-items: center;
