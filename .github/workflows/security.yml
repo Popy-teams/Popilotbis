@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Trivy — ${{ matrix.target.name }}
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: ${{ matrix.target.scan-type }}
           scan-ref: ${{ matrix.target.scan-ref }}
