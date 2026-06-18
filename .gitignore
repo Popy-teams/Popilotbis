@@ -8,3 +8,14 @@ dist/
 .DS_Store
 .cursor/
 *.local
+
+# Tests & couverture
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.vitest/
+
+# IDE
+.idea/
+*.swp

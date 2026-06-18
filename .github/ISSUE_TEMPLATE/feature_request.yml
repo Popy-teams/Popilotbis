@@ -1,0 +1,50 @@
+title: "Demande de fonctionnalité"
+description: Proposer une amélioration ou une nouvelle fonctionnalité
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Décrivez le besoin métier et l'impact attendu pour l'équipe projet / qualité ISO.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problème ou besoin
+      description: Quel besoin cette fonctionnalité adresse-t-elle ?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solution proposée
+      description: Comment imaginez-vous la fonctionnalité ?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module concerné
+      options:
+        - Authentification
+        - Portfolio projets
+        - Tâches / Planning
+        - Budget
+        - Risques
+        - Documentation
+        - Audit ISO 9001
+        - KPI / Tableaux de bord
+        - Autre
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: priority
+    attributes:
+      label: Priorité perçue
+      options:
+        - label: Bloquant
+        - label: Important
+        - label: Nice to have

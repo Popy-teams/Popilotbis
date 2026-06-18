@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    name: Lint, types & tests unitaires
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Installer les dépendances frontend
+        run: pnpm install --frozen-lockfile || pnpm install
+
+      - name: Lint
+        run: pnpm run lint -- --max-warnings 9999
+
+      - name: Vérification TypeScript
+        run: pnpm run typecheck
+        continue-on-error: true
+
+      - name: Tests unitaires frontend
+        run: pnpm run test:unit
+
+      - name: Build frontend
+        run: pnpm run build
+
+      - name: Installer les dépendances API
+        working-directory: server
+        run: npm ci || npm install
+
+      - name: Tests unitaires API
+        working-directory: server
+        env:
+          DATABASE_URL: postgresql://popilot:popilot@localhost:5432/popilot
+          JWT_SECRET: ci-test-secret
+        run: npm test
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: popilot
+          POSTGRES_USER: popilot
+          POSTGRES_PASSWORD: popilot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U popilot -d popilot"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10

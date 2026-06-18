@@ -1,0 +1,45 @@
+title: "Rapport de sécurité"
+description: Signaler une vulnérabilité ou un problème de sécurité
+labels: ["security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de signaler les problèmes de sécurité de manière responsable.
+        **Ne publiez pas de secrets, tokens ou mots de passe dans cette issue.**
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Gravité estimée
+      options:
+        - Critique
+        - Élevée
+        - Moyenne
+        - Faible
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Type de vulnérabilité, composant affecté, impact potentiel
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Étapes de reproduction (si applicable)
+      placeholder: |
+        1. ...
+        2. ...
+
+  - type: checkboxes
+    id: disclosure
+    attributes:
+      label: Divulgation
+      options:
+        - label: Je comprends qu'il ne faut pas exposer publiquement d'exploit fonctionnel avant correction
+          required: true

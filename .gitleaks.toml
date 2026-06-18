@@ -1,0 +1,23 @@
+# Configuration Gitleaks — Popilot
+# https://github.com/gitleaks/gitleaks
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Faux positifs connus du projet Popilot"
+paths = [
+  '''db/init/''',
+  '''server/src/scripts/seed\.js''',
+  '''\.github/workflows/''',
+  '''e2e/''',
+  '''src/app/auth/AuthPage\.tsx''',
+]
+
+[[allowlist.regexes]]
+description = "Mot de passe démo documenté"
+regex = '''Popilot2026!'''
+
+[[allowlist.regexes]]
+description = "JWT secret de développement Docker"
+regex = '''dev-popilot-jwt-secret'''
