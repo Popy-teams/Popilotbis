@@ -56,10 +56,10 @@ export function TestModeBadge() {
 
 export function TaskStatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string; Icon: LucideIcon }> = {
-    todo: { label: 'A faire', color: 'bg-gray-100 text-gray-800 border-gray-200', Icon: Clock },
+    todo: { label: 'À faire', color: 'bg-gray-100 text-gray-800 border-gray-200', Icon: Clock },
     'in-progress': { label: 'En cours', color: 'bg-blue-100 text-blue-800 border-blue-200', Icon: Zap },
-    blocked: { label: 'Bloquee', color: 'bg-red-100 text-red-800 border-red-200', Icon: Ban },
-    done: { label: 'Terminee', color: 'bg-green-100 text-green-800 border-green-200', Icon: Check },
+    blocked: { label: 'Bloquée', color: 'bg-red-100 text-red-800 border-red-200', Icon: Ban },
+    done: { label: 'Terminée', color: 'bg-green-100 text-green-800 border-green-200', Icon: Check },
   };
   const cfg = map[status] ?? { label: status, color: 'bg-gray-100 text-gray-800 border-gray-200', Icon: Circle };
   return (

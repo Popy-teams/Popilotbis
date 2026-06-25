@@ -577,6 +577,39 @@ export function getProcessById(processId: string): ProcessData | undefined {
   return TEST_PROCESSES.find(process => process.id === processId);
 }
 
+export interface LinkedProcessForTask {
+  id: string;
+  title: string;
+  type: ProcessData['type'];
+  steps: { id: string; title: string }[];
+}
+
+/** Résout les processus (et étapes) liés à une tâche */
+export function getLinkedProcessesForTask(
+  processIds: string[] | undefined,
+  stepIds: string[] | undefined
+): LinkedProcessForTask[] {
+  if (!processIds?.length) return [];
+
+  return processIds
+    .map((processId) => {
+      const process = getProcessById(processId);
+      if (!process) return null;
+      const linkedSteps = (stepIds ?? [])
+        .map((stepId) => process.steps.find((s) => s.id === stepId))
+        .filter((s): s is ProcessData['steps'][number] => Boolean(s))
+        .map((s) => ({ id: s.id, title: s.title }));
+
+      return {
+        id: process.id,
+        title: process.title,
+        type: process.type,
+        steps: linkedSteps,
+      };
+    })
+    .filter((p): p is LinkedProcessForTask => p !== null);
+}
+
 // Fonction pour obtenir les processus par type
 export function getProcessesByType(type: ProcessData['type']): ProcessData[] {
   return TEST_PROCESSES.filter(process => process.type === type);
