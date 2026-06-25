@@ -18,6 +18,7 @@ import { evaluateStage } from '../utils/pipelineSync';
 import { PageBackHeader } from './shared/PageBackHeader';
 import { ViewShell, ViewHeader, ActionButton } from './shared';
 import { TaskStatusBadge } from './shared/displayHelpers';
+import { PipelineStageFormPage } from './pipeline/PipelineStageFormPage';
 import { useNavigate } from 'react-router';
 import { getRoutePath } from '../routes/viewRoutes';
 import { calculateTaskProgress } from '../data/testData';
@@ -26,7 +27,7 @@ type PageMode = 'list' | 'view' | 'edit' | 'create';
 
 type StageForm = {
   name: string;
-  purposeText: string;
+  objectives: string[];
   startDate: string;
   endDate: string;
   estimatedDuration: string;
@@ -34,7 +35,7 @@ type StageForm = {
 
 const emptyStageForm = (): StageForm => ({
   name: '',
-  purposeText: '',
+  objectives: [],
   startDate: '',
   endDate: '',
   estimatedDuration: '',
@@ -62,8 +63,8 @@ function syncDurationFromDates(startDate: string, endDate: string): string {
   return days !== null ? String(days) : '';
 }
 
-function linesToArray(text: string) {
-  return text.split('\n').map((l) => l.trim()).filter(Boolean);
+function normalizeObjectives(items: string[]) {
+  return items.map((item) => item.trim()).filter(Boolean);
 }
 
 function StatusLabel({ status }: { status: PipelineStage['status'] }) {
@@ -168,7 +169,7 @@ export function PipelineView() {
     const durationFromDates = syncDurationFromDates(startDate, endDate);
     setForm({
       name: stage.name,
-      purposeText: stage.objectives.join('\n'),
+      objectives: stage.objectives.length > 0 ? [...stage.objectives] : [],
       startDate,
       endDate,
       estimatedDuration:
@@ -226,7 +227,7 @@ export function PipelineView() {
     order: base?.order ?? scopedStages.length + 1,
     status: base?.status ?? 'not-started',
     progress: base?.progress ?? 0,
-    objectives: linesToArray(form.purposeText),
+    objectives: normalizeObjectives(form.objectives),
     deliverables: base?.deliverables ?? [],
     exitCriteria: base?.exitCriteria ?? [],
     tasks: base?.tasks ?? [],
@@ -260,127 +261,61 @@ export function PipelineView() {
     refresh();
   };
 
-  const stageForm = (onCancel: () => void, submitLabel: string, linkedTaskCount = 0) => (
-    <form onSubmit={saveStage} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5 shadow-sm">
-      <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
-        <p className="font-medium mb-1">Comment fonctionne une étape ?</p>
-        <p className="text-blue-800">
-          Le <strong>suivi réel</strong> (progression, livrables, conditions de sortie) passe par les{' '}
-          <strong>tâches</strong> et <strong>documents</strong> liés à l&apos;étape — pas par des champs
-          texte libres. Ici vous définissez uniquement le cadre de l&apos;étape.
-        </p>
-        {linkedTaskCount > 0 && (
-          <p className="mt-2 text-blue-700">
-            {linkedTaskCount} tâche(s) déjà liée(s) — modifiez-les depuis l&apos;onglet Tâches.
-          </p>
-        )}
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Nom de l&apos;étape *</label>
-        <input
-          required
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          placeholder="Ex : Cadrage, Conception, Tests..."
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Date de début</label>
-          <input
-            type="date"
-            value={form.startDate}
-            onChange={(e) => handleStartDateChange(e.target.value)}
-            max={form.endDate || undefined}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Date de fin</label>
-          <input
-            type="date"
-            value={form.endDate}
-            onChange={(e) => handleEndDateChange(e.target.value)}
-            min={form.startDate || undefined}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Durée (jours)
-            {durationFromDates && (
-              <span className="ml-1 font-normal text-gray-500">— calculée</span>
-            )}
-          </label>
-          <input
-            type="number"
-            min={1}
-            value={form.estimatedDuration}
-            onChange={(e) => handleDurationChange(e.target.value)}
-            readOnly={durationFromDates}
-            placeholder={durationFromDates ? undefined : 'Ex : 30'}
-            className={`w-full px-4 py-2 border border-gray-300 rounded-lg ${
-              durationFromDates ? 'bg-gray-50 text-gray-700 cursor-default' : ''
-            }`}
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            {durationFromDates
-              ? 'Mise à jour automatique à partir des dates.'
-              : 'Saisissez la durée pour calculer la date manquante, ou les deux dates pour obtenir la durée.'}
-          </p>
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Intention de l&apos;étape <span className="font-normal text-gray-500">(optionnel)</span>
-        </label>
-        <p className="text-xs text-gray-500 mb-2">
-          Décrivez le but de cette étape — une ligne par point. Ce texte est informatif ; la progression
-          est calculée automatiquement depuis les tâches liées.
-        </p>
-        <textarea
-          rows={4}
-          value={form.purposeText}
-          onChange={(e) => setForm({ ...form, purposeText: e.target.value })}
-          placeholder={'Ex :\nDéfinir le périmètre du projet\nIdentifier les parties prenantes\nÉtablir le budget prévisionnel'}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-        />
-      </div>
-
-      <div className="flex gap-3 pt-2">
-        <button type="button" onClick={onCancel} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-          Annuler
-        </button>
-        <button type="submit" className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
-          {submitLabel}
-        </button>
-      </div>
-    </form>
-  );
+  const navigateTo = (view: 'tasks' | 'documentation' | 'risks') => {
+    navigate(`/${getRoutePath(view)}`);
+  };
 
   if (pageMode === 'create') {
     return (
-      <ViewShell narrow>
-        <PageBackHeader title="Nouvelle étape pipeline" subtitle={activeProject?.name} onBack={() => setPageMode('list')} />
-        {stageForm(() => setPageMode('list'), 'Créer l\'étape')}
-      </ViewShell>
+      <PipelineStageFormPage
+        mode="create"
+        title="Nouvelle étape"
+        subtitle={activeProject ? `Pipeline — ${activeProject.name}` : 'Pipeline du projet'}
+        values={form}
+        durationFromDates={durationFromDates}
+        submitLabel="Créer l'étape"
+        onBack={() => setPageMode('list')}
+        onSubmit={saveStage}
+        onNameChange={(name) => setForm((prev) => ({ ...prev, name }))}
+        onObjectivesChange={(objectives) => setForm((prev) => ({ ...prev, objectives }))}
+        onStartDateChange={handleStartDateChange}
+        onEndDateChange={handleEndDateChange}
+        onDurationChange={handleDurationChange}
+      />
     );
   }
 
   if (pageMode === 'edit' && selectedStage) {
+    const stage = scopedStages.find((s) => s.id === selectedStage.id) ?? selectedStage;
+    const related = getRelatedForStage(stage.id);
+    const linkedTasks = tasks.filter((t) => stage.tasks.includes(t.id) || t.stageId === stage.id);
+    const gate = evaluateStage(stage, tasks, documents);
+
     return (
-      <ViewShell narrow>
-        <PageBackHeader
-          title="Modifier l'étape"
-          subtitle={`Étape ${selectedStage.order} / ${scopedStages.length}`}
-          onBack={() => setPageMode('view')}
-        />
-        {stageForm(() => setPageMode('view'), 'Enregistrer', selectedStage.tasks.length)}
-      </ViewShell>
+      <PipelineStageFormPage
+        mode="edit"
+        title="Modifier l'étape"
+        subtitle={`${stage.name} — étape ${stage.order} / ${scopedStages.length}`}
+        values={form}
+        durationFromDates={durationFromDates}
+        submitLabel="Enregistrer"
+        onBack={() => setPageMode('view')}
+        onSubmit={saveStage}
+        onNameChange={(name) => setForm((prev) => ({ ...prev, name }))}
+        onObjectivesChange={(objectives) => setForm((prev) => ({ ...prev, objectives }))}
+        onStartDateChange={handleStartDateChange}
+        onEndDateChange={handleEndDateChange}
+        onDurationChange={handleDurationChange}
+        gate={gate}
+        linkedTasks={linkedTasks}
+        linkedDocuments={related.documents}
+        linkedRisks={related.risks}
+        referenceDeliverables={stage.deliverables}
+        referenceExitCriteria={stage.exitCriteria}
+        onOpenTasks={() => navigateTo('tasks')}
+        onOpenDocuments={() => navigateTo('documentation')}
+        onOpenRisks={() => navigateTo('risks')}
+      />
     );
   }
 
@@ -541,7 +476,7 @@ export function PipelineView() {
                 </p>
                 {stage.objectives.length > 0 && (
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-800 mb-2">Intention</h4>
+                    <h4 className="text-sm font-semibold text-gray-800 mb-2">Objectifs</h4>
                     <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
                       {stage.objectives.map((obj) => (
                         <li key={obj}>{obj}</li>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router';
 import { useProjectContext } from '../context/ProjectContext';
 import {
   ChevronRight,
@@ -32,6 +33,7 @@ type ProcessType = ProcessData['type'];
 
 export function ProcessView() {
   const { activeProject, activeProjectSlug, matchesProject } = useProjectContext();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [pageMode, setPageMode] = useState<PageMode>('list');
   const [selectedProcess, setSelectedProcess] = useState<ProcessData | null>(null);
   const [processes, setProcesses] = useState<ProcessData[]>([]);
@@ -51,6 +53,18 @@ export function ProcessView() {
       setProcesses([]);
     }
   }, [activeProject, activeProjectSlug, matchesProject]);
+
+  useEffect(() => {
+    const processId = searchParams.get('id');
+    if (!processId || processes.length === 0) return;
+
+    const process = processes.find((p) => p.id === processId);
+    if (process) {
+      setSelectedProcess(process);
+      setPageMode('view');
+      setSearchParams({}, { replace: true });
+    }
+  }, [processes, searchParams, setSearchParams]);
 
   const processTypes = [
     { type: 'pilotage' as const, label: 'Processus de pilotage', subtitle: 'DÉCIDER', icon: Target, color: 'indigo', description: 'Donner la direction et arbitrer' },
