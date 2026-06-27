@@ -17,6 +17,7 @@ import {
   Smile,
   Award,
   BarChart3,
+  PartyPopper,
 } from 'lucide-react';
 
 export type ViewType =
@@ -25,6 +26,7 @@ export type ViewType =
   | 'projects'
   | 'tasks'
   | 'team'
+  | 'team-space'
   | 'budget'
   | 'meetings'
   | 'process'
@@ -57,6 +59,7 @@ export const APP_ROUTES: AppRouteConfig[] = [
   { id: 'pipeline', path: 'pipeline', label: 'Pipeline & Étapes', icon: Package, section: 'management' },
   { id: 'tasks', path: 'taches', label: 'Tâches', icon: CheckSquare, section: 'management' },
   { id: 'team', path: 'equipe', label: 'Équipe', icon: Users, section: 'management' },
+  { id: 'team-space', path: 'espace-equipe', label: 'Espace Équipe', icon: PartyPopper, section: 'management' },
   { id: 'meetings', path: 'reunions', label: 'Réunions & CR', icon: FileText, section: 'management' },
   { id: 'calendar', path: 'planning', label: 'Planning', icon: Calendar, section: 'management' },
   { id: 'budget', path: 'budget', label: 'Budget', icon: DollarSign, section: 'management' },

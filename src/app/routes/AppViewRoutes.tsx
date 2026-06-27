@@ -4,6 +4,7 @@ import { Dashboard } from '../components/Dashboard';
 import { ProjectsFeature } from '../features/projects/ProjectsFeature';
 import { TasksViewWithTestData } from '../components/TasksViewWithTestData';
 import { TeamViewWithTestData } from '../components/TeamViewWithTestData';
+import { TeamSpaceView } from '../features/team-space/TeamSpaceView';
 import { BudgetView } from '../components/BudgetView';
 import { MeetingsView } from '../components/MeetingsView';
 import { ProcessView } from '../components/ProcessView';
@@ -26,6 +27,7 @@ export const VIEW_ELEMENTS: Record<ViewType, ReactNode> = {
   pipeline: <PipelineView />,
   tasks: <TasksViewWithTestData />,
   team: <TeamViewWithTestData />,
+  'team-space': <TeamSpaceView />,
   meetings: <MeetingsView />,
   calendar: <Calendar />,
   budget: <BudgetView />,

@@ -1,5 +1,6 @@
 export { AppIcon, StatIcon, iconSizeClass, type IconSize } from './icons';
 export { FormSelect, type FormSelectProps } from './FormSelect';
+export { FormActions } from './FormActions';
 export { SearchField, type SearchFieldProps } from './SearchField';
 export { IconButton, ActionButton, HeroButton } from './IconButton';
 export { HeroSurfaceContext, useHeroSurface, heroButtonStyles, actionButtonBaseClass } from './HeroSurfaceContext';

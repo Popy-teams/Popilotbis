@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { Outlet } from 'react-router';
+import { Navigate, Outlet } from 'react-router';
 import { Sidebar } from '../components/Sidebar';
 import { Header } from '../components/Header';
 import { useAuth } from '../auth/AuthContext';
+import { LOGIN_PATH } from '../routes/viewRoutes';
 
 export function AppLayout() {
   const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  if (!user) return null;
+  if (!user) return <Navigate to={LOGIN_PATH} replace />;
 
   return (
     <div className="flex h-screen saas-shell overflow-hidden">

@@ -75,15 +75,20 @@ function canUserSeeProject(project: Project, user: AuthUser, memberId: string): 
 }
 
 async function fetchApiProjects(): Promise<Project[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5_000);
   try {
     const res = await fetch(`${API_BASE}/projects`, {
       headers: { Authorization: `Bearer ${publicAnonKey}` },
+      signal: controller.signal,
     });
     if (!res.ok) return [];
     const json = await res.json();
     return json.success && Array.isArray(json.data) ? json.data : [];
   } catch {
     return [];
+  } finally {
+    clearTimeout(timer);
   }
 }
 

@@ -22,11 +22,16 @@ import {
   POPY_MEETING_DEMO,
 } from '../data/meetingDemoData';
 import { GANTT_STORAGE_KEY, MEETINGS_STORAGE_KEY } from '../data/initialMeetings';
+import {
+  buildPlanningCalendarDemo,
+  DEMO_PLANNING_CALENDAR_IDS,
+} from '../data/planningDemoFixtures';
+import { CALENDAR_STORAGE_KEY } from './meetingSync';
 import { TASKS_STORAGE_KEY } from './pipelineSync';
 import { mergeDemoData } from './demoDataMerge';
 
 const SEED_VERSION_KEY = 'popilot:demo-seed-version';
-const CURRENT_SEED_VERSION = '7';
+const CURRENT_SEED_VERSION = '9';
 
 function mergeStorage<T extends { id: string | number }>(key: string, incoming: T[]) {
   if (incoming.length === 0) return;
@@ -71,6 +76,14 @@ function seedMeetingDemoBundle() {
   upsertByIds(GANTT_STORAGE_KEY, INITIAL_GANTT_ITEMS, DEMO_GANTT_IDS);
 }
 
+function seedPlanningCalendarDemo() {
+  upsertByIds(
+    CALENDAR_STORAGE_KEY,
+    buildPlanningCalendarDemo(),
+    DEMO_PLANNING_CALENDAR_IDS
+  );
+}
+
 /** Injecte les fixtures multi-projets (idempotent, sans écraser les données existantes). */
 export function seedMultiProjectDemoData() {
   try {
@@ -88,11 +101,12 @@ export function seedMultiProjectDemoData() {
     mergeStorage('popilot:dashboard-alerts-local', DEMO_ALERTS_BY_PROJECT);
     mergeStorage('popilot:budget-bom-local', DEMO_BOM_BY_PROJECT);
     mergeStorage(
-      'popilot:calendar-events',
+      CALENDAR_STORAGE_KEY,
       DEMO_CALENDAR_BY_PROJECT.map((e) => ({ ...e, date: e.date }))
     );
 
     seedMeetingDemoBundle();
+    seedPlanningCalendarDemo();
 
     localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION);
   } catch {

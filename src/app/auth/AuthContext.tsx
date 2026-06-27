@@ -10,6 +10,22 @@ interface AuthContextValue {
   logout: () => void;
 }
 
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 8_000;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('AUTH_TIMEOUT')), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -24,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      const me = await meRequest();
+      const me = await withTimeout(meRequest(), AUTH_BOOTSTRAP_TIMEOUT_MS);
       setUser(me);
     } catch {
       setStoredToken(null);
