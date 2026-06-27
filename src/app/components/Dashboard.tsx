@@ -5,7 +5,7 @@ import { filterByActiveProject } from '../utils/projectMatch';
 import { DEMO_ALERTS_BY_PROJECT } from '../data/multiProjectDemoFixtures';
 import { mergeDemoData } from '../utils/demoDataMerge';
 import { PageBackHeader } from './shared/PageBackHeader';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton } from './shared';
+import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton, ViewStatCard, ViewStatsGrid } from './shared';
 
 type DashboardPageMode = 'overview' | 'create-project' | 'create-report' | 'create-meeting' | 'create-alert' | 'edit-alert' | 'manage-alerts';
 
@@ -244,6 +244,8 @@ export function Dashboard() {
             ? `Vue d'ensemble — ${activeProject.name}`
             : "Vue d'ensemble de vos projets et indicateurs clés"
         }
+        badge="Pilotage · Dashboard"
+        theme="indigo"
       />
 
       <div className={viewGrids.stats4}>
@@ -354,8 +356,8 @@ export function Dashboard() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm">
-                        <span className="text-gray-900 font-medium">{(project.budget.used / 1000).toFixed(0)}k€</span>
-                        <span className="text-gray-500"> / {(project.budget.total / 1000).toFixed(0)}k€</span>
+                        <span className="text-gray-900 font-medium">{((project.budget?.used ?? 0) / 1000).toFixed(0)}k€</span>
+                        <span className="text-gray-500"> / {((project.budget?.total ?? 0) / 1000).toFixed(0)}k€</span>
                       </div>
                     </td>
                   </tr>

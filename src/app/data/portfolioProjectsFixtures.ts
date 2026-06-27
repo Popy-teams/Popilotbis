@@ -11,7 +11,7 @@ export const PORTFOLIO_PROJECT_FIXTURES = [
     budget: { used: 182000, total: 250000 },
     team: ['ME', 'FA', 'SO', 'EM'],
     isRestricted: false,
-    participantIds: ['user-shirel', 'user-sonia', 'user-7', 'admin'],
+    participantIds: ['user-sonia', 'user-7', 'admin', 'user-5'],
   },
   {
     id: 'project:portfolio-ia-emotions',
@@ -35,7 +35,7 @@ export const PORTFOLIO_PROJECT_FIXTURES = [
     priority: 'medium',
     deadline: '2026-10-01',
     budget: { used: 62000, total: 170000 },
-    team: ['DA', 'EM', 'DL', 'SH'],
+    team: ['DA', 'EM', 'DL', 'EB'],
   },
   {
     id: 'project:portfolio-cyber-rgpd',
@@ -71,6 +71,6 @@ export const PORTFOLIO_PROJECT_FIXTURES = [
     priority: 'medium',
     deadline: '2026-05-30',
     budget: { used: 96000, total: 115000 },
-    team: ['SO', 'SH', 'ER', 'YA'],
+    team: ['SO', 'EB', 'ER', 'YA'],
   },
 ];

@@ -392,7 +392,9 @@ export function ProcessView() {
     <ViewShell>
       <ViewHeader
         title={activeProject.name}
-        subtitle="Cartographie des processus ISO 9001"
+        subtitle="Cartographie des processus ISO 9001 — pilotage, réalisation, support et amélioration"
+        badge="ISO 9001 · Processus"
+        theme="indigo"
         actions={
           <ActionButton icon={Plus} onClick={() => openCreate()}>Créer un processus</ActionButton>
         }

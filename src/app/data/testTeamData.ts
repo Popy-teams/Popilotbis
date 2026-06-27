@@ -4,6 +4,9 @@
 export interface TeamMemberData {
   id: string;
   projectId?: string;
+  positionId: string;
+  /** ID assigné dans l'onglet Tâches (assignedTo), si différent */
+  tasksUserId?: string;
   name: string;
   initials: string;
   role: string;
@@ -11,8 +14,7 @@ export interface TeamMemberData {
   email: string;
   phone?: string;
   photoUrl?: string;
-  workload: number; // Calculé automatiquement selon les tâches assignées
-  assignedTasks: string[]; // IDs des tâches assignées
+  workload: number;
   responsibilities: string[];
   skills: string[];
   availability: 'Disponible' | 'Surchargé' | 'En congé';
@@ -20,35 +22,10 @@ export interface TeamMemberData {
 }
 
 export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
-  // Direction & Coordination
-  {
-    id: 'user-shirel',
-    name: 'SHIREL',
-    initials: 'SH',
-    role: 'Chef de projet / Product Owner (PO)',
-    category: 'Direction & Coordination',
-    email: 'shirel@popy-robot.com',
-    phone: '+33 6 12 34 56 01',
-    photoUrl: undefined,
-    workload: 0, // Sera calculé
-    assignedTasks: ['task-5', 'task-6', 'task-12'],
-    responsibilities: [
-      'Vision du produit',
-      'Gestion du planning (2 ans)',
-      'Coordination des équipes',
-      'Validation technique + UX'
-    ],
-    skills: [
-      'Gestion projet agile',
-      'Documentation',
-      'Communication / Leadership',
-      'Connaissance hardware + IA'
-    ],
-    availability: 'Disponible',
-    trophies: ['Leadership', 'Vision stratégique']
-  },
   {
     id: 'user-sonia',
+    positionId: 'pos-qa',
+    tasksUserId: 'user-7',
     name: 'Sonia',
     initials: 'SO',
     role: 'Responsable Qualité & Processus (QA / QMS)',
@@ -57,7 +34,6 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
     phone: '+33 6 12 34 56 02',
     photoUrl: undefined,
     workload: 0,
-    assignedTasks: ['task-8', 'task-9'],
     responsibilities: [
       'Standardisation du code',
       'Standardisation de l\'assemblage robot',
@@ -77,6 +53,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   // Hardware & IoT
   {
     id: 'user-erwan',
+    positionId: 'pos-iot',
     name: 'Erwan',
     initials: 'ER',
     role: 'Ingénieur IoT / Électronique',
@@ -85,7 +62,6 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
     phone: '+33 6 12 34 56 03',
     photoUrl: undefined,
     workload: 0,
-    assignedTasks: ['task-1', 'task-7'],
     responsibilities: [
       'Design circuits électroniques',
       'Gestion sensors : ToF, IMU, caméra, servos',
@@ -103,6 +79,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   },
   {
     id: 'user-yacine',
+    positionId: 'pos-meca',
     name: 'Yacine',
     initials: 'YA',
     role: 'Ingénieur mécatronique / robotique',
@@ -111,7 +88,6 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
     phone: '+33 6 12 34 56 04',
     photoUrl: undefined,
     workload: 0,
-    assignedTasks: ['task-1'],
     responsibilities: [
       'Moteurs, servos, cinématique',
       'Conception structure interne',
@@ -129,6 +105,8 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   },
   {
     id: 'user-fabio',
+    positionId: 'pos-embedded',
+    tasksUserId: 'user-6',
     name: 'Fabio',
     initials: 'FA',
     role: 'Ingénieur IoT système embarqué',
@@ -137,7 +115,6 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
     phone: '+33 6 12 34 56 05',
     photoUrl: undefined,
     workload: 0,
-    assignedTasks: ['task-1', 'task-4'],
     responsibilities: [
       'OS embarqué',
       'Communication entre modules',
@@ -157,6 +134,8 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   // Intelligence Artificielle
   {
     id: 'user-meriem',
+    positionId: 'pos-cv',
+    tasksUserId: 'user-1',
     name: 'Mériem',
     initials: 'ME',
     role: 'Ingénieur IA / Vision (Computer Vision)',
@@ -165,7 +144,6 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
     phone: '+33 6 12 34 56 06',
     photoUrl: undefined,
     workload: 0,
-    assignedTasks: ['task-1', 'task-3'],
     responsibilities: [
       'Détection émotions',
       'Vision 1080p',
@@ -183,6 +161,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   },
   {
     id: 'user-claude',
+    positionId: 'pos-nlp',
     name: 'Claude',
     initials: 'CL',
     role: 'Ingénieur IA / NLP (Langage & voix)',
@@ -191,7 +170,6 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
     phone: '+33 6 12 34 56 07',
     photoUrl: undefined,
     workload: 0,
-    assignedTasks: ['task-1'],
     responsibilities: [
       'Compréhension du langage',
       'Wake word "POPY écoute"',
@@ -209,6 +187,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   },
   {
     id: 'user-data-ia',
+    positionId: 'pos-ml',
     name: 'Sarah',
     initials: 'SA',
     role: 'Ingénieur IA / Séries temporelles & comportement',
@@ -217,7 +196,6 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
     phone: '+33 6 12 34 56 08',
     photoUrl: undefined,
     workload: 0,
-    assignedTasks: [],
     responsibilities: [
       'Analyse émotionnelle continue',
       'Suivi attentionnel / fatigue',
@@ -236,6 +214,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   // Cybersécurité & protection enfant
   {
     id: 'user-cyber',
+    positionId: 'pos-cyber',
     name: 'Marc',
     initials: 'MA',
     role: 'Ingénieur Cybersécurité',
@@ -244,7 +223,6 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
     phone: '+33 6 12 34 56 09',
     photoUrl: undefined,
     workload: 0,
-    assignedTasks: ['task-8'],
     responsibilities: [
       'Sécurité du robot',
       'Chiffrement total',
@@ -262,6 +240,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   },
   {
     id: 'user-rgpd',
+    positionId: 'pos-rgpd',
     name: 'Julie',
     initials: 'JU',
     role: 'Responsable protection des données (RGPD / Enfant)',
@@ -270,7 +249,6 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
     phone: '+33 6 12 34 56 10',
     photoUrl: undefined,
     workload: 0,
-    assignedTasks: [],
     responsibilities: [
       'Conformité totale',
       'Gestion données locales',
@@ -290,6 +268,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   // Cloud, Backend & Big Data
   {
     id: 'user-cloud',
+    positionId: 'pos-devops',
     name: 'David',
     initials: 'DA',
     role: 'Ingénieur Cloud / DevOps',
@@ -298,7 +277,6 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
     phone: '+33 6 12 34 56 11',
     photoUrl: undefined,
     workload: 0,
-    assignedTasks: ['task-11'],
     responsibilities: [
       'API parentale',
       'Interface web',
@@ -316,6 +294,8 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   },
   {
     id: 'user-data',
+    positionId: 'pos-data',
+    tasksUserId: 'user-5',
     name: 'Emma',
     initials: 'EM',
     role: 'Data Engineer / Big Data',
@@ -324,7 +304,6 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
     phone: '+33 6 12 34 56 12',
     photoUrl: undefined,
     workload: 0,
-    assignedTasks: ['task-12'],
     responsibilities: [
       'Stockage métriques apprentissage',
       'Stats enseignants',
@@ -342,22 +321,6 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   },
 ];
 
-// Fonction pour calculer la charge de travail d'un membre
-export function calculateMemberWorkload(memberId: string, totalTasks: number): number {
-  const member = TEST_TEAM_MEMBERS.find(m => m.id === memberId);
-  if (!member || totalTasks === 0) return 0;
-  
-  // Pourcentage = (tâches assignées / total tâches) * 100
-  const workloadPercentage = Math.round((member.assignedTasks.length / totalTasks) * 100);
-  return Math.min(workloadPercentage, 100); // Max 100%
-}
-
-// Fonction pour obtenir les membres par catégorie
-export function getMembersByCategory(category: string): TeamMemberData[] {
-  return TEST_TEAM_MEMBERS.filter(m => m.category === category);
-}
-
-// Fonction pour obtenir toutes les catégories
-export function getCategories(): string[] {
-  return Array.from(new Set(TEST_TEAM_MEMBERS.map(m => m.category)));
+export function getMembersByCategory(category: string, members = TEST_TEAM_MEMBERS): TeamMemberData[] {
+  return members.filter((m) => m.category === category);
 }

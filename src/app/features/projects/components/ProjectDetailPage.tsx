@@ -9,6 +9,8 @@ import {
   getStatusColor,
   getStatusHint,
   getStatusLabel,
+  getProjectBudget,
+  getBudgetUsagePercent,
   withEffectiveStatus,
 } from './projectPresentation';
 
@@ -38,8 +40,8 @@ export function ProjectDetailPage({
   const project = withEffectiveStatus(rawProject);
   const priority = getPriorityBadge(project.priority);
   const PriorityIcon = priority.icon;
-  const budgetRate =
-    project.budget.total > 0 ? Math.round((project.budget.used / project.budget.total) * 100) : 0;
+  const budget = getProjectBudget(project);
+  const budgetRate = getBudgetUsagePercent(project);
   const daysLeft = getDaysUntilDeadline(project.deadline);
 
   const participantNames =
@@ -157,9 +159,9 @@ export function ProjectDetailPage({
             <AppIcon icon={DollarSign} size="xs" />
             Budget
           </div>
-          <p className="font-semibold text-slate-900">{formatBudget(project.budget.used)}</p>
+          <p className="font-semibold text-slate-900">{formatBudget(budget.used)}</p>
           <p className="text-xs text-slate-500 mt-1">
-            sur {formatBudget(project.budget.total)} ({budgetRate} %)
+            sur {formatBudget(budget.total)} ({budgetRate} %)
           </p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -216,11 +218,11 @@ export function ProjectDetailPage({
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Consommé</span>
-              <span className="font-medium">{formatBudget(project.budget.used)}</span>
+              <span className="font-medium">{formatBudget(budget.used)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Enveloppe totale</span>
-              <span className="font-medium">{formatBudget(project.budget.total)}</span>
+              <span className="font-medium">{formatBudget(budget.total)}</span>
             </div>
             <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden mt-2">
               <div

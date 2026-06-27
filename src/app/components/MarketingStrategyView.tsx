@@ -437,11 +437,13 @@ export function MarketingStrategyView() {
     <ViewShell>
       <ViewHeader
         title="Stratégie Marketing & Communication"
-        subtitle="Positionnement premium, pricing skimming, industrialisation progressive • Projet POPY"
+        subtitle="Positionnement premium, pricing skimming et industrialisation progressive"
+        badge="Marketing · POPY"
+        theme="violet"
         actions={
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <ActionButton variant="secondary" icon={Download}>Export stratégie</ActionButton>
-            <ActionButton icon={Plus} onClick={openCreateAction} className="bg-purple-600 hover:bg-purple-700">Ajouter action</ActionButton>
+            <ActionButton icon={Plus} onClick={openCreateAction} className="!bg-purple-600 hover:!bg-purple-700 !text-white">Ajouter action</ActionButton>
           </div>
         }
       />

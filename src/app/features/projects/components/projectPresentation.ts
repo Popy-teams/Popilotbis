@@ -95,3 +95,21 @@ export function getPriorityLabel(priority: Project['priority']) {
 export function formatBudget(amount: number) {
   return `${amount.toLocaleString('fr-FR')} €`;
 }
+
+const DEFAULT_BUDGET = { total: 0, used: 0, committed: 0 };
+
+/** Budget normalisé — évite les crashs si données API incomplètes */
+export function getProjectBudget(project: Pick<Project, 'budget'> | Partial<Project>) {
+  const budget = project.budget ?? DEFAULT_BUDGET;
+  return {
+    total: budget.total ?? 0,
+    used: budget.used ?? 0,
+    committed: budget.committed ?? 0,
+  };
+}
+
+export function getBudgetUsagePercent(project: Pick<Project, 'budget'> | Partial<Project>): number {
+  const { total, used } = getProjectBudget(project);
+  if (total <= 0) return 0;
+  return Math.round((used / total) * 100);
+}

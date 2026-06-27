@@ -30,7 +30,7 @@ import {
   Video,
 } from 'lucide-react';
 import { PageBackHeader } from './shared/PageBackHeader';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton, FormSelect, SearchField } from './shared';
+import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton, FormSelect, SearchField, ViewStatCard, ViewStatsGrid } from './shared';
 import {
   BOMComponent,
   Quote,
@@ -789,75 +789,48 @@ export function BudgetView() {
     <ViewShell>
       <ViewHeader
         title="Budget & BOM"
-        subtitle="Bill of Materials, devis, fournisseurs et suivi budgétaire"
+        subtitle="Bill of Materials, devis, fournisseurs et suivi budgétaire en temps réel"
+        badge="Finances · BOM"
+        theme="emerald"
         actions={
           <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full sm:w-auto">
             <ActionButton variant="secondary" icon={Upload}>Importer BOM</ActionButton>
             <ActionButton variant="secondary" icon={Download}>Exporter</ActionButton>
-            <ActionButton icon={Plus} onClick={openCreateComponent} className="bg-green-600 hover:bg-green-700">Nouveau composant</ActionButton>
+            <ActionButton icon={Plus} onClick={openCreateComponent} className="!bg-green-600 hover:!bg-green-700 !text-white">Nouveau composant</ActionButton>
           </div>
         }
       />
 
-      {/* Indicateurs Budget - Toujours visibles */}
-      <div className={`${viewGrids.stats4} mt-2`}>
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Budget Estimé</span>
-              <Package className="w-4 h-4 text-gray-400" />
-            </div>
-            <div className="text-2xl font-bold text-gray-900">
-              {tracking.estimatedTotal.toFixed(2)} €
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              {scopedBomComponents.length} composants
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Budget Validé</span>
-              <CheckCircle className="w-4 h-4 text-green-500" />
-            </div>
-            <div className="text-2xl font-bold text-green-600">
-              {tracking.validatedTotal.toFixed(2)} €
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              {quotes.filter((q) => q.status === 'accepted').length} devis acceptés
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Budget Engagé</span>
-              <Clock className="w-4 h-4 text-orange-500" />
-            </div>
-            <div className="text-2xl font-bold text-orange-600">
-              {tracking.committedTotal.toFixed(2)} €
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              Commandes en cours
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Écart Budget</span>
-              {tracking.deviationPercent > 0 ? (
-                <ArrowUpRight className="w-4 h-4 text-red-500" />
-              ) : (
-                <ArrowDownRight className="w-4 h-4 text-green-500" />
-              )}
-            </div>
-            <div className={`text-2xl font-bold ${tracking.deviationPercent > 0 ? 'text-red-600' : 'text-green-600'}`}>
-              {tracking.deviationPercent > 0 ? '+' : ''}
-              {tracking.deviationPercent.toFixed(1)}%
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              {tracking.deviationAmount > 0 ? '+' : ''}
-              {tracking.deviationAmount.toFixed(2)} €
-          </div>
-        </div>
+      <ViewStatsGrid cols={4}>
+        <ViewStatCard
+          label="Budget Estimé"
+          value={`${tracking.estimatedTotal.toFixed(2)} €`}
+          hint={`${scopedBomComponents.length} composants`}
+          gradient="from-slate-500 to-slate-700"
+          icon={Package}
+        />
+        <ViewStatCard
+          label="Budget Validé"
+          value={`${tracking.validatedTotal.toFixed(2)} €`}
+          hint={`${quotes.filter((q) => q.status === 'accepted').length} devis acceptés`}
+          gradient="from-emerald-500 to-teal-500"
+          icon={CheckCircle}
+        />
+        <ViewStatCard
+          label="Budget Engagé"
+          value={`${tracking.committedTotal.toFixed(2)} €`}
+          hint="Commandes en cours"
+          gradient="from-amber-500 to-orange-500"
+          icon={Clock}
+        />
+        <ViewStatCard
+          label="Écart Budget"
+          value={`${tracking.deviationPercent > 0 ? '+' : ''}${tracking.deviationPercent.toFixed(1)}%`}
+          hint={`${tracking.deviationAmount > 0 ? '+' : ''}${tracking.deviationAmount.toFixed(2)} €`}
+          gradient={tracking.deviationPercent > 0 ? 'from-red-500 to-rose-500' : 'from-emerald-500 to-teal-500'}
+          icon={tracking.deviationPercent > 0 ? ArrowUpRight : ArrowDownRight}
+        />
+      </ViewStatsGrid>
 
         {/* Alertes */}
         {tracking.alerts.length > 0 && (
@@ -892,7 +865,6 @@ export function BudgetView() {
             ))}
           </div>
         )}
-      </div>
 
       {/* Onglets */}
       <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">

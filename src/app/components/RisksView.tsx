@@ -46,7 +46,7 @@ import { usePipeline } from '../context/PipelineContext';
 import { RISKS_STORAGE_KEY } from '../utils/pipelineSync';
 import { DEMO_RISKS_BY_PROJECT } from '../data/multiProjectDemoFixtures';
 import { mergeDemoData } from '../utils/demoDataMerge';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton, FormSelect, SearchField } from './shared';
+import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton, FormSelect, SearchField, ViewStatCard, ViewStatsGrid } from './shared';
 
 type PageMode = 'list' | 'create' | 'view' | 'edit';
 
@@ -760,67 +760,20 @@ export function RisksView() {
     <ViewShell>
       <ViewHeader
         title="Gestion des Risques & Opportunités"
-        subtitle="ISO 9001 §6.1 - Registre central, analyse, traitement et traçabilité"
-        actions={<ActionButton icon={Plus} onClick={openCreate} className="bg-red-600 hover:bg-red-700">Nouveau risque</ActionButton>}
+        subtitle="ISO 9001 §6.1 — registre central, analyse, traitement et traçabilité"
+        badge="ISO §6.1 · Risques"
+        theme="red"
+        actions={<ActionButton icon={Plus} onClick={openCreate} className="!bg-red-600 hover:!bg-red-700 !text-white">Nouveau risque</ActionButton>}
       />
 
-      {/* Stats globales */}
-      <div className={viewGrids.stats6}>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total</p>
-              <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
-            </div>
-            <Shield className="w-10 h-10 text-blue-600 bg-blue-100 p-2 rounded-lg" />
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Risques</p>
-              <p className="text-2xl font-bold text-red-600">{stats.risks}</p>
-            </div>
-            <AlertTriangle className="w-10 h-10 text-red-600 bg-red-100 p-2 rounded-lg" />
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Opportunités</p>
-              <p className="text-2xl font-bold text-green-600">{stats.opportunities}</p>
-            </div>
-            <TrendingUp className="w-10 h-10 text-green-600 bg-green-100 p-2 rounded-lg" />
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Ouverts</p>
-              <p className="text-2xl font-bold text-orange-600">{stats.open}</p>
-            </div>
-            <AlertCircle className="w-10 h-10 text-orange-600 bg-orange-100 p-2 rounded-lg" />
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">En traitement</p>
-              <p className="text-2xl font-bold text-yellow-600">{stats.inTreatment}</p>
-            </div>
-            <Clock className="w-10 h-10 text-yellow-600 bg-yellow-100 p-2 rounded-lg" />
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Critiques</p>
-              <p className="text-2xl font-bold text-red-600">{stats.critical}</p>
-            </div>
-            <AlertTriangle className="w-10 h-10 text-red-600 bg-red-100 p-2 rounded-lg" />
-          </div>
-        </div>
-      </div>
+      <ViewStatsGrid cols={6}>
+        <ViewStatCard label="Total" value={String(stats.total)} gradient="from-blue-500 to-indigo-500" icon={Shield} />
+        <ViewStatCard label="Risques" value={String(stats.risks)} gradient="from-red-500 to-rose-500" icon={AlertTriangle} />
+        <ViewStatCard label="Opportunités" value={String(stats.opportunities)} gradient="from-emerald-500 to-teal-500" icon={TrendingUp} />
+        <ViewStatCard label="Ouverts" value={String(stats.open)} gradient="from-amber-500 to-orange-500" icon={AlertCircle} />
+        <ViewStatCard label="En traitement" value={String(stats.inTreatment)} gradient="from-yellow-500 to-amber-500" icon={Clock} />
+        <ViewStatCard label="Critiques" value={String(stats.critical)} gradient="from-red-600 to-rose-600" icon={AlertTriangle} />
+      </ViewStatsGrid>
 
       {/* Répartition par criticité */}
       <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-6">

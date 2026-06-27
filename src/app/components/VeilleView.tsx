@@ -625,7 +625,9 @@ export function VeilleView() {
     <ViewShell>
       <ViewHeader
         title="Veille ISO 9001"
-        subtitle="Surveillance réglementaire, marché, technologique et interne • Exigence ISO §4.1, §4.2"
+        subtitle="Surveillance réglementaire, marché, technologique et interne — exigences ISO §4.1 et §4.2"
+        badge="Veille · ISO"
+        theme="cyan"
         actions={
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <ActionButton variant="secondary" icon={Download} onClick={() => alert('Export registre de veille pour audit ISO')}>

@@ -22,6 +22,11 @@ export interface TestTask {
   linkedToProcessSteps?: string[]; // IDs des étapes de processus liées
   /** Étape du pipeline projet (ex. stage-1 = Cadrage) */
   stageId?: string;
+  /** Réunion d'origine (CR) */
+  sourceMeetingId?: string;
+  sourceActionId?: string;
+  /** Date de début pour le Gantt */
+  startDate?: string;
 }
 
 export interface TestTeamMember {

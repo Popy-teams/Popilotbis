@@ -5,7 +5,7 @@ import { Project } from '../../types';
 import { ProjectDetailPage } from './components/ProjectDetailPage';
 import { ProjectFormPage } from './components/ProjectFormPage';
 import { ProjectsListPage } from './components/ProjectsListPage';
-import { computeProjectStatus, withEffectiveStatus } from './components/projectPresentation';
+import { computeProjectStatus, withEffectiveStatus, getProjectBudget } from './components/projectPresentation';
 import { createProject, deleteProject, initProjectsFixtures, updateProject } from './services/projectsService';
 
 type Mode = 'list' | 'create' | 'view' | 'edit';
@@ -122,7 +122,7 @@ export function ProjectsFeature() {
       progress,
       startDate: form.startDate,
       deadline: form.deadline,
-      budget: { total: parseInt(form.budgetTotal || '0', 10), used: base?.budget.used ?? 0 },
+      budget: { total: parseInt(form.budgetTotal || '0', 10), used: getProjectBudget(base).used },
       team: selectedMemberInitials,
       participantIds: form.isRestricted ? form.selectedMembers : members.map((m) => m.id),
       isRestricted: form.isRestricted,
@@ -144,7 +144,7 @@ export function ProjectsFeature() {
       priority: p.priority,
       startDate: p.startDate || '',
       deadline: p.deadline,
-      budgetTotal: String(p.budget.total),
+      budgetTotal: String(getProjectBudget(p).total),
       selectedMembers: p.participantIds?.length
         ? p.participantIds
         : members.filter((m) => p.team?.includes(m.initials)).map((m) => m.id),

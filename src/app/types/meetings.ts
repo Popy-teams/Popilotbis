@@ -1,5 +1,7 @@
 // Types supplémentaires pour le système de réunions avancé
 
+import type { TestTask } from '../data/testData';
+
 export interface MeetingRotation {
   id: string;
   projectId: string;
@@ -133,10 +135,9 @@ export function calculateNextWriter(
 export function extractActionsFromText(
   text: string,
   speaker: string,
-  existingTasks: Task[]
+  existingTasks: TestTask[]
 ): ExtractionSuggestion[] {
   const suggestions: ExtractionSuggestion[] = [];
-  
   // Patterns de détection
   const completionPatterns = [
     /j'ai (demandé|envoyé|terminé|validé|fait|rédigé|préparé)/gi,

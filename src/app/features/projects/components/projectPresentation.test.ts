@@ -3,6 +3,8 @@ import {
   computeProjectStatus,
   getDaysUntilDeadline,
   getStatusLabel,
+  getProjectBudget,
+  getBudgetUsagePercent,
 } from './projectPresentation';
 
 describe('computeProjectStatus', () => {
@@ -54,5 +56,12 @@ describe('getDaysUntilDeadline', () => {
 describe('getStatusLabel', () => {
   it('traduit completed', () => {
     expect(getStatusLabel('completed')).toBe('Terminé');
+  });
+});
+
+describe('getProjectBudget', () => {
+  it('retourne des valeurs par défaut si budget absent', () => {
+    expect(getProjectBudget({})).toEqual({ total: 0, used: 0, committed: 0 });
+    expect(getBudgetUsagePercent({})).toBe(0);
   });
 });

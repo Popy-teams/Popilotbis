@@ -51,6 +51,13 @@ function normalizeProject(p: Project): Project {
     slug: p.slug ?? (p.id.includes('popy') ? 'popy' : getProjectSlug(p)),
     participantIds,
     isRestricted: p.isRestricted ?? false,
+    progress: p.progress ?? 0,
+    team: p.team ?? [],
+    budget: {
+      total: p.budget?.total ?? 0,
+      used: p.budget?.used ?? 0,
+      committed: p.budget?.committed ?? 0,
+    },
   };
 }
 

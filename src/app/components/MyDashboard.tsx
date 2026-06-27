@@ -19,7 +19,7 @@ import {
   Send,
 } from 'lucide-react';
 import { PageBackHeader } from './shared/PageBackHeader';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, StatIcon, IconButton, ActionButton, IconLabel } from './shared';
+import { ViewShell, viewGrids, TableWrap, AppIcon, StatIcon, IconButton, ActionButton, IconLabel, ViewHero, ViewStatCard, ViewStatsGrid } from './shared';
 
 type PageMode = 'dashboard' | 'declare-blockage';
 
@@ -358,57 +358,20 @@ export function MyDashboard() {
 
   return (
     <ViewShell>
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 rounded-xl">
-        <h1 className="page-title text-white flex flex-col sm:flex-row items-start sm:items-center gap-2">
-          Bonjour {myData.name.split(' ')[0]}
-          <AppIcon icon={Hand} size="xl" className="text-white" />
-        </h1>
-        <p className="mt-2 text-blue-100">
-          Voici votre tableau de bord personnel. POPILOT est là pour vous guider.
-        </p>
-      </div>
+      <ViewHero
+        title={`Bonjour ${myData.name.split(' ')[0]}`}
+        subtitle="Voici votre tableau de bord personnel. POPILOT est là pour vous guider."
+        badge="Mon espace · Personnel"
+        badgeIcon={Hand}
+        theme="blue"
+      />
 
-      <div className={viewGrids.stats4}>
-        <div className="bg-white p-6 rounded-xl border border-gray-200">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Tâches en cours</p>
-              <p className="text-3xl font-bold mt-2 text-blue-600">{tasksInProgress}</p>
-            </div>
-            <StatIcon icon={Clock} className="text-blue-600 bg-blue-100" />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-gray-200">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Tâches terminées</p>
-              <p className="text-3xl font-bold mt-2 text-green-600">{tasksCompleted}</p>
-            </div>
-            <StatIcon icon={CheckCircle} className="text-green-600 bg-green-100" />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-gray-200">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Tâches urgentes</p>
-              <p className="text-3xl font-bold mt-2 text-red-600">{urgentTasks}</p>
-            </div>
-            <StatIcon icon={AlertCircle} className="text-red-600 bg-red-100" />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-gray-200">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Charge de travail</p>
-              <p className="text-3xl font-bold mt-2 text-orange-600">{myData.workload}%</p>
-            </div>
-            <StatIcon icon={TrendingUp} className="text-orange-600 bg-orange-100" />
-          </div>
-        </div>
-      </div>
+      <ViewStatsGrid cols={4}>
+        <ViewStatCard label="Tâches en cours" value={String(tasksInProgress)} gradient="from-blue-500 to-indigo-500" icon={Clock} />
+        <ViewStatCard label="Tâches terminées" value={String(tasksCompleted)} gradient="from-emerald-500 to-teal-500" icon={CheckCircle} />
+        <ViewStatCard label="Tâches urgentes" value={String(urgentTasks)} gradient="from-red-500 to-rose-500" icon={AlertCircle} />
+        <ViewStatCard label="Charge de travail" value={`${myData.workload}%`} gradient="from-amber-500 to-orange-500" icon={TrendingUp} />
+      </ViewStatsGrid>
 
       <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
         <h2 className="text-xl font-bold text-blue-900 flex items-center gap-2 mb-4">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { TEST_TASKS, TEST_TEAM_MEMBERS, type TestTask } from '../data/testData';
+import { MEETING_DEMO_TASKS } from '../data/meetingDemoData';
 import { DEMO_TASKS_BY_PROJECT } from '../data/multiProjectDemoFixtures';
 import { mergeDemoData } from '../utils/demoDataMerge';
 import { useProjectContext } from '../context/ProjectContext';
@@ -38,13 +39,22 @@ export function TasksViewWithTestData() {
   );
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(TASKS_STORAGE_KEY);
-      const saved = raw ? (JSON.parse(raw) as TestTask[]) : [];
-      setTasks(mergeDemoData(saved, DEMO_TASKS_BY_PROJECT, TEST_TASKS));
-    } catch {
-      // ignore
-    }
+    const reload = () => {
+      try {
+        const raw = localStorage.getItem(TASKS_STORAGE_KEY);
+        const saved = raw ? (JSON.parse(raw) as TestTask[]) : [];
+        setTasks(mergeDemoData(saved, DEMO_TASKS_BY_PROJECT, MEETING_DEMO_TASKS, TEST_TASKS));
+      } catch {
+        // ignore
+      }
+    };
+    reload();
+    window.addEventListener('popilot:pipeline-updated', reload);
+    window.addEventListener('popilot:meetings-updated', reload);
+    return () => {
+      window.removeEventListener('popilot:pipeline-updated', reload);
+      window.removeEventListener('popilot:meetings-updated', reload);
+    };
   }, []);
 
   const projectTasks = tasks.filter((t) => matchesProject(t.projectId));

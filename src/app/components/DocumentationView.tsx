@@ -30,7 +30,7 @@ import { PageBackHeader } from './shared/PageBackHeader';
 import { useProjectContext } from '../context/ProjectContext';
 import { usePipeline } from '../context/PipelineContext';
 import { applyPipelineSync, DOCS_STORAGE_KEY } from '../utils/pipelineSync';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, StatIcon, IconButton, ActionButton, IconLabel, FormSelect, SearchField } from './shared';
+import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, StatIcon, IconButton, ActionButton, IconLabel, FormSelect, SearchField, ViewStatCard, ViewStatsGrid } from './shared';
 import type { LucideIcon } from 'lucide-react';
 import {
   ISODocument,
@@ -633,61 +633,25 @@ export function DocumentationView() {
   return (
     <ViewShell>
       <ViewHeader
-        title="Documentation Projet - Mémoire Stratégique"
-        subtitle="Études, faisabilité, conception, financier, marketing, RH, qualité & pilotage"
+        title="Documentation Projet"
+        subtitle="Mémoire stratégique — études, faisabilité, conception, financier, marketing, RH, qualité & pilotage"
+        badge="Mémoire · ISO"
+        theme="blue"
         actions={<ActionButton icon={Plus} onClick={openCreate}>Nouveau document</ActionButton>}
       />
 
-      {/* Stats globales */}
-      <div className={viewGrids.stats5}>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total documents</p>
-              <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
-            </div>
-            <StatIcon icon={FileText} className="text-blue-600 bg-blue-100" />
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Validés</p>
-              <p className="text-2xl font-bold text-green-600">{stats.validated}</p>
-            </div>
-            <StatIcon icon={CheckCircle} className="text-green-600 bg-green-100" />
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Brouillons</p>
-              <p className="text-2xl font-bold text-yellow-600">{stats.draft}</p>
-            </div>
-            <StatIcon icon={Clock} className="text-yellow-600 bg-yellow-100" />
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Critiques</p>
-              <p className="text-2xl font-bold text-red-600">{stats.critical}</p>
-            </div>
-            <StatIcon icon={AlertCircle} className="text-red-600 bg-red-100" />
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Conformité ISO</p>
-              <p className="text-2xl font-bold text-purple-600">
-                {Math.round((complianceStats.compliant / ISO_REQUIREMENTS.length) * 100)}%
-              </p>
-            </div>
-            <StatIcon icon={Shield} className="text-purple-600 bg-purple-100" />
-          </div>
-        </div>
-      </div>
+      <ViewStatsGrid cols={5}>
+        <ViewStatCard label="Total documents" value={String(stats.total)} gradient="from-blue-500 to-indigo-500" icon={FileText} />
+        <ViewStatCard label="Validés" value={String(stats.validated)} gradient="from-emerald-500 to-teal-500" icon={CheckCircle} />
+        <ViewStatCard label="Brouillons" value={String(stats.draft)} gradient="from-amber-500 to-orange-500" icon={Clock} />
+        <ViewStatCard label="Critiques" value={String(stats.critical)} gradient="from-red-500 to-rose-500" icon={AlertCircle} />
+        <ViewStatCard
+          label="Conformité ISO"
+          value={`${Math.round((complianceStats.compliant / ISO_REQUIREMENTS.length) * 100)}%`}
+          gradient="from-violet-500 to-purple-500"
+          icon={Shield}
+        />
+      </ViewStatsGrid>
 
       {/* Stats par catégorie */}
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-xl p-6">

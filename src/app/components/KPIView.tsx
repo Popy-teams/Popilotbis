@@ -458,11 +458,12 @@ export function KPIView() {
         <ViewHeader
           title="Tableau de bord KPI"
           subtitle={
-            <span className="flex items-center gap-2">
-              <AppIcon icon={Clock} size="sm" />
-              {activeProject ? `Projet : ${activeProject.name}` : 'Sélectionnez un projet'} — Dernière mise à jour: 24 février 2026
-            </span>
+            activeProject
+              ? `${activeProject.name} — Dernière mise à jour : 24 février 2026`
+              : 'Sélectionnez un projet — Dernière mise à jour : 24 février 2026'
           }
+          badge="Indicateurs · KPI"
+          theme="amber"
           actions={
             <ActionButton icon={Plus} onClick={openCreate}>Nouveau KPI</ActionButton>
           }

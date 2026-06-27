@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '../ui/utils';
+import { ViewHero, type HeroTheme } from './ViewPremium';
 
 interface ViewShellProps {
   children: ReactNode;
@@ -19,19 +21,51 @@ export function ViewShell({ children, narrow = false, className }: ViewShellProp
 interface ViewHeaderProps {
   title: string;
   subtitle?: ReactNode;
+  badge?: string;
+  badgeIcon?: LucideIcon;
+  theme?: HeroTheme;
   actions?: ReactNode;
+  sidePanel?: ReactNode;
+  stats?: ReactNode;
+  /** simple = ancien en-tête texte ; premium = bannière hero (défaut) */
+  variant?: 'premium' | 'simple';
 }
 
-/** En-tete de liste (sans bouton retour) */
-export function ViewHeader({ title, subtitle, actions }: ViewHeaderProps) {
-  return (
-    <div className="view-header">
-      <div className="min-w-0">
-        <h1 className="page-title">{title}</h1>
-        {subtitle ? <div className="text-sm sm:text-base text-gray-600 mt-1">{subtitle}</div> : null}
+/** En-tête de liste premium (bannière hero) ou simple */
+export function ViewHeader({
+  title,
+  subtitle,
+  badge,
+  badgeIcon,
+  theme = 'indigo',
+  actions,
+  sidePanel,
+  stats,
+  variant = 'premium',
+}: ViewHeaderProps) {
+  if (variant === 'simple') {
+    return (
+      <div className="view-header">
+        <div className="min-w-0">
+          <h1 className="page-title">{title}</h1>
+          {subtitle ? <div className="text-sm sm:text-base text-gray-600 mt-1">{subtitle}</div> : null}
+        </div>
+        {actions ? <div className="flex flex-wrap gap-2 w-full sm:w-auto">{actions}</div> : null}
       </div>
-      {actions ? <div className="flex flex-wrap gap-2 w-full sm:w-auto">{actions}</div> : null}
-    </div>
+    );
+  }
+
+  return (
+    <ViewHero
+      title={title}
+      subtitle={subtitle}
+      badge={badge}
+      badgeIcon={badgeIcon}
+      theme={theme}
+      actions={actions}
+      sidePanel={sidePanel}
+      stats={stats}
+    />
   );
 }
 

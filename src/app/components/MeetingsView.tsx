@@ -1,203 +1,166 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Plus,
-  Calendar,
-  Clock,
-  Users,
+  Filter,
+  BarChart3,
+  List,
   FileText,
-  CheckCircle,
-  AlertCircle,
-  AlertTriangle,
-  Edit,
-  Eye,
-  RotateCcw,
-  Save,
-  Trash2,
-  Pencil,
-  ArrowRight,
-  Info,
+  Calendar,
+  CheckCircle2,
+  Link2,
+  Sparkles,
 } from 'lucide-react';
-import { PageBackHeader } from './shared/PageBackHeader';
 import { useProjectContext } from '../context/ProjectContext';
-import { DEMO_MEETINGS_BY_PROJECT } from '../data/multiProjectDemoFixtures';
-import { mergeDemoData } from '../utils/demoDataMerge';
+import { usePipeline } from '../context/PipelineContext';
 import { calculateCurrentWriter, calculateNextWriter } from '../types/meetings';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton } from './shared';
+import type { ScrumMeetingRecord, ScrumMeetingType, GanttItem } from '../types/scrumMeetings';
+import {
+  SCRUM_MEETING_LABELS,
+  defaultAgendaForType,
+} from '../types/scrumMeetings';
+import {
+  loadMeetings,
+  saveMeetings,
+  loadGanttItems,
+  publishMeetingReport,
+  upsertPlannedMeetingCalendar,
+  getPipelineStagesForProject,
+} from '../utils/meetingSync';
+import { ViewShell, SearchField, ViewStatCard, ViewStatsGrid, ViewSectionTitle, ViewTabPills, ViewTabBtn, ViewEmptyState, ViewFilterPanel } from './shared';
+import { FormSelect } from './shared/FormSelect';
+import {
+  MeetingFormPage,
+  emptyMeetingForm,
+  type MeetingFormValues,
+} from './meetings/MeetingFormPage';
+import {
+  MeetingReportPage,
+} from './meetings/MeetingReportPage';
+import { buildReportForm, mergeReportActions, type ReportFormState, getPendingActionsForMeeting, buildDraftMeetingFromForm } from '../utils/meetingFollowUp';
+import { loadAllTasks } from '../utils/pipelineSync';
+import { MeetingDetailPage } from './meetings/MeetingDetailPage';
+import { MeetingGanttPanel } from './meetings/MeetingGanttPanel';
+import { MeetingCard } from './meetings/MeetingCard';
+import { MeetingsHero } from './meetings/MeetingsHero';
+import {
+  getNextMeetingNumber,
+  getSuggestedSprintNumber,
+  buildDefaultMeetingTitle,
+} from './meetings/scrumPresentation';
+import { TEST_TEAM_MEMBERS } from '../data/testData';
 
 type PageMode = 'list' | 'create' | 'view' | 'edit' | 'report';
-
-interface LocalMeeting {
-  id: number;
-  number: number;
-  title: string;
-  date: string;
-  time: string;
-  duration: number;
-  participants: number;
-  participantNames?: string[];
-  writerId: string;
-  writerName: string;
-  status: 'planned' | 'in-progress' | 'completed';
-  hasReport: boolean;
-  projectId?: string;
-  projectName: string;
-  decisions: number;
-  actions: number;
-  reportDecisions?: string;
-  reportActions?: string;
-}
-
-const INITIAL_MEETINGS: LocalMeeting[] = [
-  {
-    id: 1,
-    number: 12,
-    title: 'Sprint Review #12 - POPY',
-    date: '2026-01-17',
-    time: '14:00',
-    duration: 120,
-    participants: 8,
-    writerId: 'user-2',
-    writerName: 'Alice Chevalier',
-    status: 'planned',
-    hasReport: false,
-    projectName: 'POPY',
-    decisions: 0,
-    actions: 0,
-  },
-  {
-    id: 2,
-    number: 11,
-    title: 'Sprint Review #11 - POPY',
-    date: '2026-01-03',
-    time: '14:00',
-    duration: 90,
-    participants: 8,
-    writerId: 'user-1',
-    writerName: 'Mériem Alami',
-    status: 'completed',
-    hasReport: true,
-    projectName: 'POPY',
-    decisions: 4,
-    actions: 12,
-  },
-  {
-    id: 3,
-    number: 10,
-    title: 'Comité Pilotage POPY',
-    date: '2025-12-20',
-    time: '10:00',
-    duration: 120,
-    participants: 10,
-    writerId: 'user-3',
-    writerName: 'Thomas Serrano',
-    status: 'completed',
-    hasReport: true,
-    projectName: 'POPY',
-    decisions: 7,
-    actions: 8,
-  },
-  {
-    id: 4,
-    number: 9,
-    title: 'Revue Technique Hardware',
-    date: '2025-12-15',
-    time: '15:00',
-    duration: 60,
-    participants: 5,
-    writerId: 'user-4',
-    writerName: 'Paul Leblanc',
-    status: 'completed',
-    hasReport: true,
-    projectName: 'POPY',
-    decisions: 3,
-    actions: 6,
-  },
-];
-
-const TEAM_MEMBERS = [
-  'Mériem Alami',
-  'Alice Chevalier',
-  'Thomas Serrano',
-  'Paul Leblanc',
-  'Marie Laurent',
-  'Jean Dupont',
-  'Aline Moreau',
-  'Karim Benali',
-];
+type ListTab = 'overview' | 'reports' | 'gantt';
 
 const ROTATION = {
   id: 'rotation-1',
   projectId: 'popy',
-  membersOrder: ['user-1', 'user-2', 'user-3', 'user-4'],
-  memberNames: ['Mériem Alami', 'Alice Chevalier', 'Thomas Serrano', 'Paul Leblanc'],
+  membersOrder: TEST_TEAM_MEMBERS.slice(0, 4).map((m) => m.id),
+  memberNames: TEST_TEAM_MEMBERS.slice(0, 4).map((m) => m.name),
   periodDays: 15,
   startDate: '2026-01-01',
 };
 
-const emptyForm = {
-  title: '',
-  date: '',
-  time: '14:00',
-  duration: 60,
-  participants: [] as string[],
-};
+function meetingToForm(m: ScrumMeetingRecord): MeetingFormValues {
+  return {
+    title: m.title,
+    meetingType: m.meetingType,
+    sprintNumber: m.sprintNumber ? String(m.sprintNumber) : '',
+    date: m.date,
+    time: m.time,
+    duration: m.duration,
+    participants: m.participants,
+    facilitator: m.facilitator ?? '',
+  };
+}
 
-function countLines(text: string): number {
-  return text.split('\n').filter((l) => l.trim()).length;
+function buildMeetingFromForm(
+  values: MeetingFormValues,
+  base: Partial<ScrumMeetingRecord>,
+  writer: { writerId: string; writerName: string }
+): ScrumMeetingRecord {
+  return {
+    id: base.id ?? `meeting-${Date.now()}`,
+    number: base.number ?? 1,
+    title: values.title.trim(),
+    meetingType: values.meetingType,
+    sprintNumber: values.sprintNumber ? parseInt(values.sprintNumber, 10) : undefined,
+    date: values.date,
+    time: values.time,
+    duration: values.duration,
+    participants: values.participants,
+    writerId: writer.writerId,
+    writerName: writer.writerName,
+    facilitator: values.facilitator || undefined,
+    status: base.status ?? 'planned',
+    hasReport: base.hasReport ?? false,
+    projectId: base.projectId,
+    projectName: base.projectName ?? 'POPY',
+    agenda: base.agenda?.length ? base.agenda : defaultAgendaForType(values.meetingType),
+    roundTable: base.roundTable ?? [],
+    decisions: base.decisions ?? [],
+    actions: base.actions ?? [],
+    notes: base.notes,
+    linkedDocumentId: base.linkedDocumentId,
+    linkedTaskIds: base.linkedTaskIds,
+    annexes: base.annexes,
+  };
 }
 
 export function MeetingsView() {
   const { matchesProject, activeProjectSlug, activeProject } = useProjectContext();
+  const { stages } = usePipeline();
   const [pageMode, setPageMode] = useState<PageMode>('list');
-  const [meetings, setMeetings] = useState<LocalMeeting[]>(INITIAL_MEETINGS);
-  const [selectedMeeting, setSelectedMeeting] = useState<LocalMeeting | null>(null);
-  const [form, setForm] = useState(emptyForm);
-  const [reportDecisions, setReportDecisions] = useState('');
-  const [reportActions, setReportActions] = useState('');
+  const [listTab, setListTab] = useState<ListTab>('overview');
+  const [meetings, setMeetings] = useState<ScrumMeetingRecord[]>(() => loadMeetings());
+  const [ganttItems, setGanttItems] = useState<GanttItem[]>(() => loadGanttItems());
+  const [selectedMeeting, setSelectedMeeting] = useState<ScrumMeetingRecord | null>(null);
+  const [form, setForm] = useState<MeetingFormValues>(emptyMeetingForm());
+  const [reportForm, setReportForm] = useState<ReportFormState>(() => ({
+    decisions: [],
+    followUpActions: [],
+    newActions: [],
+    notes: '',
+    roundTableNotes: '',
+  }));
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [typeFilter, setTypeFilter] = useState<ScrumMeetingType | 'all'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [publishMessage, setPublishMessage] = useState<string | null>(null);
+
+  const refreshGantt = () => setGanttItems(loadGanttItems());
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('popilot:meetings-local');
-      const saved = raw ? (JSON.parse(raw) as LocalMeeting[]) : [];
-      setMeetings(mergeDemoData(saved, DEMO_MEETINGS_BY_PROJECT, INITIAL_MEETINGS));
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('popilot:meetings-local', JSON.stringify(meetings));
-    } catch {
-      /* ignore */
-    }
+    saveMeetings(meetings);
   }, [meetings]);
+
+  useEffect(() => {
+    const onGantt = () => refreshGantt();
+    window.addEventListener('popilot:gantt-updated', onGantt);
+    return () => window.removeEventListener('popilot:gantt-updated', onGantt);
+  }, []);
 
   const scopedMeetings = useMemo(
     () => meetings.filter((m) => matchesProject(m.projectId ?? 'popy')),
     [meetings, matchesProject]
   );
 
+  const scopedGantt = useMemo(
+    () => ganttItems.filter((g) => matchesProject(g.projectId ?? 'popy')),
+    [ganttItems, matchesProject]
+  );
+
+  const pipelineStages = useMemo(
+    () => getPipelineStagesForProject(activeProjectSlug ?? 'popy', stages),
+    [activeProjectSlug, stages]
+  );
+
   const currentWriterId = calculateCurrentWriter(ROTATION, new Date().toISOString());
   const currentWriterIndex = ROTATION.membersOrder.indexOf(currentWriterId);
-  const currentWriterName = ROTATION.memberNames[currentWriterIndex];
+  const currentWriterName = ROTATION.memberNames[currentWriterIndex] ?? '—';
   const nextWriter = calculateNextWriter(ROTATION, currentWriterId);
   const nextWriterIndex = ROTATION.membersOrder.indexOf(nextWriter.nextWriterId);
-  const nextWriterName = ROTATION.memberNames[nextWriterIndex];
-
-  const upcomingMeetings = scopedMeetings.filter((m) => m.status === 'planned');
-  const pastMeetings = scopedMeetings.filter((m) => m.status === 'completed');
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'in-progress':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const nextWriterName = ROTATION.memberNames[nextWriterIndex] ?? '—';
 
   const getWriterForDate = (date: string) => {
     const writerId = calculateCurrentWriter(ROTATION, date);
@@ -205,46 +168,104 @@ export function MeetingsView() {
     return { writerId, writerName: ROTATION.memberNames[idx] ?? 'Non assigné' };
   };
 
-  const toggleParticipant = (name: string) => {
-    setForm((prev) => ({
-      ...prev,
-      participants: prev.participants.includes(name)
-        ? prev.participants.filter((p) => p !== name)
-        : [...prev.participants, name],
-    }));
+  const filteredMeetings = useMemo(() => {
+    return scopedMeetings
+      .filter((m) => {
+        if (typeFilter !== 'all' && m.meetingType !== typeFilter) return false;
+        if (dateFrom && m.date < dateFrom) return false;
+        if (dateTo && m.date > dateTo) return false;
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          return (
+            m.title.toLowerCase().includes(q) ||
+            m.writerName.toLowerCase().includes(q) ||
+            String(m.number).includes(q)
+          );
+        }
+        return true;
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [scopedMeetings, typeFilter, dateFrom, dateTo, searchQuery]);
+
+  const upcomingMeetings = scopedMeetings.filter((m) => m.status === 'planned');
+  const publishedReports = filteredMeetings.filter((m) => m.hasReport);
+
+  const stats = {
+    planned: upcomingMeetings.length,
+    published: scopedMeetings.filter((m) => m.hasReport).length,
+    decisions: scopedMeetings.reduce((a, m) => a + (m.decisions ?? []).length, 0),
+    tasksLinked: scopedMeetings.reduce((a, m) => a + (m.linkedTaskIds?.length ?? 0), 0),
   };
 
-  const openCreate = () => {
-    setForm(emptyForm);
+  const openCreate = (type: ScrumMeetingType = 'review') => {
+    const projectId = activeProjectSlug ?? 'popy';
+    const sprint = getSuggestedSprintNumber(meetings, projectId, type);
+    const ceremonyNum = getNextMeetingNumber(meetings, type, projectId);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setForm({
+      ...emptyMeetingForm(type),
+      sprintNumber: String(sprint),
+      title: buildDefaultMeetingTitle(type, sprint, ceremonyNum),
+      date: tomorrow.toISOString().slice(0, 10),
+      participants: TEST_TEAM_MEMBERS.slice(0, 4).map((m) => m.name),
+    });
     setSelectedMeeting(null);
     setPageMode('create');
   };
 
-  const openEdit = (meeting: LocalMeeting) => {
+  const applyCreateDefaultsForType = (type: ScrumMeetingType) => {
+    const projectId = activeProjectSlug ?? 'popy';
+    const sprint = getSuggestedSprintNumber(meetings, projectId, type);
+    const ceremonyNum = getNextMeetingNumber(meetings, type, projectId);
+    setForm((prev) => ({
+      ...prev,
+      meetingType: type,
+      sprintNumber: String(sprint),
+      title: buildDefaultMeetingTitle(type, sprint, ceremonyNum),
+      duration: type === 'daily' ? 15 : type === 'planning' ? 120 : 60,
+    }));
+  };
+
+  const projectId = activeProjectSlug ?? 'popy';
+
+  const formPendingTasks = useMemo(() => {
+    if (pageMode !== 'create' && pageMode !== 'edit') return [];
+    const ceremonyNum = getNextMeetingNumber(meetings, form.meetingType, projectId);
+    const draft = buildDraftMeetingFromForm(
+      form,
+      pageMode === 'edit' && selectedMeeting ? selectedMeeting.number : ceremonyNum,
+      projectId,
+      activeProject?.name ?? 'POPY'
+    );
+    if (pageMode === 'edit' && selectedMeeting) {
+      Object.assign(draft, { id: selectedMeeting.id, number: selectedMeeting.number });
+    }
+    return getPendingActionsForMeeting(draft, meetings, loadAllTasks());
+  }, [pageMode, form, meetings, projectId, activeProject?.name, selectedMeeting]);
+
+  const formPreviousSprint = form.sprintNumber
+    ? Math.max(1, parseInt(form.sprintNumber, 10) - 1)
+    : undefined;
+
+  const openEdit = (meeting: ScrumMeetingRecord) => {
     setSelectedMeeting(meeting);
-    setForm({
-      title: meeting.title,
-      date: meeting.date,
-      time: meeting.time,
-      duration: meeting.duration,
-      participants: meeting.participantNames ?? [],
-    });
+    setForm(meetingToForm(meeting));
     setPageMode('edit');
   };
 
-  const openView = (meeting: LocalMeeting) => {
+  const openView = (meeting: ScrumMeetingRecord) => {
     setSelectedMeeting(meeting);
     setPageMode('view');
   };
 
-  const openReport = (meeting: LocalMeeting) => {
+  const openReport = (meeting: ScrumMeetingRecord) => {
     setSelectedMeeting(meeting);
-    setReportDecisions(meeting.reportDecisions ?? '');
-    setReportActions(meeting.reportActions ?? '');
+    setReportForm(buildReportForm(meeting, meetings));
     setPageMode('report');
   };
 
-  const deleteMeeting = (id: number) => {
+  const deleteMeeting = (id: string) => {
     if (!confirm('Supprimer cette réunion ?')) return;
     setMeetings((prev) => prev.filter((m) => m.id !== id));
     setSelectedMeeting(null);
@@ -253,594 +274,251 @@ export function MeetingsView() {
 
   const submitForm = (e: React.FormEvent) => {
     e.preventDefault();
-    const { writerId, writerName } = getWriterForDate(form.date);
+    const writer = getWriterForDate(form.date);
 
     if (pageMode === 'create') {
-      const nextNumber = Math.max(0, ...meetings.map((m) => m.number)) + 1;
-      const nextId = Math.max(0, ...meetings.map((m) => m.id)) + 1;
-      const created: LocalMeeting = {
-        id: nextId,
+      const projectId = activeProjectSlug ?? 'popy';
+      const nextNumber = getNextMeetingNumber(meetings, form.meetingType, projectId);
+      const created = buildMeetingFromForm(form, {
         number: nextNumber,
-        title: form.title,
-        date: form.date,
-        time: form.time,
-        duration: form.duration,
-        participants: form.participants.length,
-        participantNames: form.participants,
-        writerId,
-        writerName,
-        status: 'planned',
-        hasReport: false,
-        projectId: activeProjectSlug ?? 'popy',
+        projectId,
         projectName: activeProject?.name ?? 'POPY',
-        decisions: 0,
-        actions: 0,
-      };
+        status: 'planned',
+      }, writer);
       setMeetings((prev) => [created, ...prev]);
+      upsertPlannedMeetingCalendar(created);
       setPageMode('list');
     } else if (pageMode === 'edit' && selectedMeeting) {
-      const updated: LocalMeeting = {
-        ...selectedMeeting,
-        title: form.title,
-        date: form.date,
-        time: form.time,
-        duration: form.duration,
-        participants: form.participants.length,
-        participantNames: form.participants,
-        writerId,
-        writerName,
-      };
+      const updated = buildMeetingFromForm(form, selectedMeeting, writer);
       setMeetings((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+      upsertPlannedMeetingCalendar(updated);
       setSelectedMeeting(updated);
       setPageMode('view');
     }
-    setForm(emptyForm);
+    setForm(emptyMeetingForm());
   };
 
-  const publishReport = () => {
+  const handlePublishReport = () => {
     if (!selectedMeeting) return;
-    const decisions = countLines(reportDecisions);
-    const actions = countLines(reportActions);
-    const updated: LocalMeeting = {
+    const allActions = mergeReportActions(reportForm);
+    const draft: ScrumMeetingRecord = {
       ...selectedMeeting,
-      status: 'completed',
-      hasReport: true,
-      decisions,
-      actions,
-      reportDecisions,
-      reportActions,
+      decisions: reportForm.decisions.filter((d) => d.description.trim()),
+      actions: allActions,
+      notes: reportForm.notes,
     };
-    setMeetings((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+    const result = publishMeetingReport(draft, pipelineStages);
+    setMeetings((prev) => prev.map((m) => (m.id === result.meeting.id ? result.meeting : m)));
+    refreshGantt();
+    const followUp = reportForm.followUpActions.length;
+    const newCount = reportForm.newActions.filter((a) => a.description.trim()).length;
+    setPublishMessage(
+      `CR publié : ${result.createdTasks.length} nouvelle(s) tâche(s), ${followUp} suivi(s), ${newCount} action(s) créée(s) — Tâches, Gantt & Planning mis à jour.`
+    );
     setSelectedMeeting(null);
     setPageMode('list');
+    setListTab('gantt');
+    setTimeout(() => setPublishMessage(null), 8000);
   };
 
-  const meetingFormPage = (
-    <ViewShell narrow>
-      <PageBackHeader
-        title={pageMode === 'create' ? 'Planifier une réunion' : 'Modifier la réunion'}
-        subtitle="Traçabilité ISO 9001"
+  if (pageMode === 'create' || pageMode === 'edit') {
+    return (
+      <MeetingFormPage
+        mode={pageMode}
+        values={form}
+        writerName={form.date ? getWriterForDate(form.date).writerName : currentWriterName}
+        periodDays={ROTATION.periodDays}
+        pendingTasks={formPendingTasks}
+        previousSprint={formPreviousSprint}
         onBack={() => setPageMode(pageMode === 'edit' && selectedMeeting ? 'view' : 'list')}
+        onSubmit={submitForm}
+        onChange={setForm}
+        onTypeChange={pageMode === 'create' ? applyCreateDefaultsForType : undefined}
       />
-      <form onSubmit={submitForm} className="bg-white rounded-xl border border-gray-200 p-6 space-y-6 shadow-sm">
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Titre de la réunion *</label>
-          <input
-            type="text"
-            required
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            placeholder="Ex: Sprint Review #13 - POPY"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Date *</label>
-            <input
-              type="date"
-              required
-              value={form.date}
-              onChange={(e) => setForm({ ...form, date: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Heure *</label>
-            <input
-              type="time"
-              required
-              value={form.time}
-              onChange={(e) => setForm({ ...form, time: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Durée (minutes) *</label>
-          <select
-            value={form.duration}
-            onChange={(e) => setForm({ ...form, duration: parseInt(e.target.value, 10) })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          >
-            <option value={30}>30 minutes</option>
-            <option value={60}>1 heure</option>
-            <option value={90}>1h30</option>
-            <option value={120}>2 heures</option>
-            <option value={180}>3 heures</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Participants *</label>
-          <div className="grid grid-cols-2 gap-2">
-            {TEAM_MEMBERS.map((member) => (
-              <label
-                key={member}
-                className="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={form.participants.includes(member)}
-                  onChange={() => toggleParticipant(member)}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-700">{member}</span>
-              </label>
-            ))}
-          </div>
-          <p className="text-xs text-gray-500 mt-2">{form.participants.length} participant(s) sélectionné(s)</p>
-        </div>
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-          <h4 className="font-semibold text-purple-900 mb-2 flex items-center gap-2">
-            <Info className="w-4 h-4" />
-            Rédacteur automatique
-          </h4>
-          <p className="text-sm text-purple-800">
-            Le rédacteur sera calculé automatiquement selon la rotation configurée (tous les {ROTATION.periodDays} jours).
-          </p>
-        </div>
-        <div className="flex gap-3 pt-4 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={() => setPageMode(pageMode === 'edit' && selectedMeeting ? 'view' : 'list')}
-            className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
-          >
-            Annuler
-          </button>
-          <button
-            type="submit"
-            className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 flex items-center justify-center gap-2"
-          >
-            <Save className="w-5 h-5" />
-            {pageMode === 'create' ? 'Planifier' : 'Enregistrer'}
-          </button>
-        </div>
-      </form>
-    </ViewShell>
-  );
-
-  if (pageMode === 'create' || pageMode === 'edit') return meetingFormPage;
+    );
+  }
 
   if (pageMode === 'view' && selectedMeeting) {
-    const meeting = selectedMeeting;
     return (
-      <ViewShell>
-        <PageBackHeader
-          title={meeting.title}
-          subtitle={
-            <span className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono text-sm">#{meeting.number}</span>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(meeting.status)}`}>
-                {meeting.status === 'completed' ? 'Publié' : 'Planifiée'}
-              </span>
-            </span>
-          }
-          onBack={() => { setPageMode('list'); setSelectedMeeting(null); }}
-          actions={
-            <div className="flex gap-2">
-              {meeting.status === 'planned' && (
-                <button
-                  type="button"
-                  onClick={() => openReport(meeting)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  <Edit className="w-4 h-4" />
-                  Rédiger CR
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => openEdit(meeting)}
-                className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                <Pencil className="w-4 h-4" />
-                Modifier
-              </button>
-              <button
-                type="button"
-                onClick={() => deleteMeeting(meeting.id)}
-                className="inline-flex items-center gap-2 px-4 py-2 border border-red-200 text-red-700 rounded-lg hover:bg-red-50"
-              >
-                <Trash2 className="w-4 h-4" />
-                Supprimer
-              </button>
-            </div>
-          }
-        />
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4 shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center gap-2 text-gray-700">
-              <Calendar className="w-4 h-4" />
-              {new Date(meeting.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-            </div>
-            <div className="flex items-center gap-2 text-gray-700">
-              <Clock className="w-4 h-4" />
-              {meeting.time} ({meeting.duration} min)
-            </div>
-            <div className="flex items-center gap-2 text-gray-700">
-              <Users className="w-4 h-4" />
-              {meeting.participants} participants
-            </div>
-            <div className="flex items-center gap-2 text-gray-700">
-              <FileText className="w-4 h-4" />
-              Rédacteur : {meeting.writerName}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">{meeting.projectName}</span>
-            {meeting.hasReport && (
-              <>
-                <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
-                  {meeting.decisions} décisions
-                </span>
-                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                  {meeting.actions} actions
-                </span>
-              </>
-            )}
-          </div>
-          {meeting.reportDecisions && (
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Décisions</h3>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{meeting.reportDecisions}</p>
-            </div>
-          )}
-          {meeting.reportActions && (
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Actions</h3>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{meeting.reportActions}</p>
-            </div>
-          )}
-        </div>
-      </ViewShell>
+      <MeetingDetailPage
+        meeting={selectedMeeting}
+        allMeetings={meetings}
+        onBack={() => { setPageMode('list'); setSelectedMeeting(null); }}
+        onEdit={() => openEdit(selectedMeeting)}
+        onReport={() => openReport(selectedMeeting)}
+        onDelete={() => deleteMeeting(selectedMeeting.id)}
+      />
     );
   }
 
   if (pageMode === 'report' && selectedMeeting) {
-    const meeting = selectedMeeting;
     return (
-      <ViewShell narrow>
-        <PageBackHeader
-          title={`Compte rendu — ${meeting.title}`}
-          subtitle={
-            <span className="flex items-center gap-2 flex-wrap text-sm">
-              <span className="font-mono">#{meeting.number}</span>
-              <span className="flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
-                {new Date(meeting.date).toLocaleDateString('fr-FR')}
-              </span>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-800 rounded-full text-xs">
-                <FileText className="w-3 h-3" />
-                {meeting.writerName}
-              </span>
-            </span>
-          }
-          onBack={() => { setPageMode('list'); setSelectedMeeting(null); }}
-        />
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6 shadow-sm">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Décisions</label>
-            <textarea
-              rows={6}
-              value={reportDecisions}
-              onChange={(e) => setReportDecisions(e.target.value)}
-              placeholder="Une décision par ligne..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Actions</label>
-            <textarea
-              rows={6}
-              value={reportActions}
-              onChange={(e) => setReportActions(e.target.value)}
-              placeholder="Une action par ligne..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="flex gap-3 pt-2 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={() => { setPageMode('list'); setSelectedMeeting(null); }}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              onClick={publishReport}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
-            >
-              <Save className="w-5 h-5" />
-              Publier le compte rendu
-            </button>
-          </div>
-        </div>
-      </ViewShell>
+      <MeetingReportPage
+        meeting={selectedMeeting}
+        form={reportForm}
+        stages={pipelineStages}
+        onBack={() => { setPageMode('view'); }}
+        onChange={setReportForm}
+        onPublish={handlePublishReport}
+      />
     );
   }
 
   return (
     <ViewShell>
-      <ViewHeader
-        title="Réunions & Comptes Rendus"
-        subtitle="Traçabilité ISO 9001 - Décisions & Actions documentées"
-        actions={<ActionButton icon={Plus} onClick={openCreate}>Planifier une réunion</ActionButton>}
+      <MeetingsHero
+        projectName={activeProject?.name ?? 'Projet'}
+        onCreate={openCreate}
+        onCreateDefault={() => openCreate('review')}
+        currentWriter={currentWriterName}
+        nextWriter={nextWriterName}
+        nextWriterDate={nextWriter.startDate}
+        rotationNames={ROTATION.memberNames}
+        periodDays={ROTATION.periodDays}
       />
 
-      <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-xl p-6">
-        <div className="flex items-start gap-4">
-          <div className="p-3 bg-purple-600 text-white rounded-lg">
-            <RotateCcw className="w-6 h-6" />
-          </div>
-          <div className="flex-1">
-            <h3 className="font-semibold text-purple-900 text-lg mb-3">
-              Rotation automatique du rédacteur (tous les {ROTATION.periodDays} jours)
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-white rounded-lg p-4 border border-purple-200">
-                <div className="text-sm text-purple-700 mb-1">Rédacteur actuel</div>
-                <div className="text-xl font-bold text-purple-900">{currentWriterName}</div>
-                <div className="text-xs text-gray-500 mt-1">Période en cours jusqu&apos;au {nextWriter.startDate}</div>
+      {publishMessage ? (
+        <div className="rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 px-5 py-4 text-sm text-emerald-900 flex items-center gap-3 shadow-sm">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+          {publishMessage}
+        </div>
+      ) : null}
+
+      <ViewStatsGrid cols={4}>
+        <ViewStatCard label="Planifiées" value={String(stats.planned)} gradient="from-blue-500 to-cyan-500" icon={Calendar} />
+        <ViewStatCard label="CR publiés" value={String(stats.published)} gradient="from-emerald-500 to-teal-500" icon={CheckCircle2} />
+        <ViewStatCard label="Décisions" value={String(stats.decisions)} gradient="from-violet-500 to-purple-500" icon={FileText} />
+        <ViewStatCard label="Tâches liées" value={String(stats.tasksLinked)} gradient="from-orange-500 to-amber-500" icon={Link2} />
+      </ViewStatsGrid>
+
+      <ViewTabPills>
+        <ViewTabBtn active={listTab === 'overview'} onClick={() => setListTab('overview')} icon={List}>
+          Vue d&apos;ensemble
+        </ViewTabBtn>
+        <ViewTabBtn active={listTab === 'reports'} onClick={() => setListTab('reports')} icon={FileText}>
+          Comptes rendus
+        </ViewTabBtn>
+        <ViewTabBtn active={listTab === 'gantt'} onClick={() => setListTab('gantt')} icon={BarChart3}>
+          Gantt
+        </ViewTabBtn>
+      </ViewTabPills>
+
+      {listTab === 'gantt' ? (
+        <MeetingGanttPanel
+          items={scopedGantt}
+          projectName={activeProject?.name ?? 'Projet'}
+          title={`Planning annuel — ${activeProject?.name ?? 'Projet'}`}
+        />
+      ) : (
+        <>
+          <ViewFilterPanel>
+            <div className="flex flex-col lg:flex-row gap-3 lg:items-end">
+              <div className="flex-1">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Recherche</label>
+                <SearchField
+                  placeholder="Réunion, rédacteur, numéro..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
               </div>
-              <div className="bg-white rounded-lg p-4 border border-purple-200">
-                <div className="text-sm text-purple-700 mb-1">Prochain rédacteur</div>
-                <div className="text-xl font-bold text-purple-900">{nextWriterName}</div>
-                <div className="text-xs text-gray-500 mt-1">À partir du {nextWriter.startDate}</div>
-              </div>
-            </div>
-            <div className="mt-4 flex items-center gap-2 text-sm text-purple-800">
-              <CheckCircle className="w-4 h-4 shrink-0" />
-              <span className="flex items-center flex-wrap gap-1">
-                Ordre de rotation :
-                {ROTATION.memberNames.map((name, idx) => (
-                  <span key={idx} className="inline-flex items-center">
-                    {idx > 0 && <ArrowRight className="w-3 h-3 mx-1 text-purple-600" />}
-                    <strong className={name === currentWriterName ? 'text-purple-900' : ''}>{name}</strong>
-                  </span>
-                ))}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className={viewGrids.stats4}>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Réunions planifiées</p>
-              <p className="text-2xl font-bold text-blue-600">{upcomingMeetings.length}</p>
-            </div>
-            <Calendar className="w-10 h-10 text-blue-600 bg-blue-100 p-2 rounded-lg" />
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">CR publiés</p>
-              <p className="text-2xl font-bold text-green-600">{pastMeetings.length}</p>
-            </div>
-            <FileText className="w-10 h-10 text-green-600 bg-green-100 p-2 rounded-lg" />
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Décisions tracées</p>
-              <p className="text-2xl font-bold text-purple-600">
-                {pastMeetings.reduce((acc, m) => acc + m.decisions, 0)}
-              </p>
-            </div>
-            <CheckCircle className="w-10 h-10 text-purple-600 bg-purple-100 p-2 rounded-lg" />
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Actions créées</p>
-              <p className="text-2xl font-bold text-orange-600">
-                {pastMeetings.reduce((acc, m) => acc + m.actions, 0)}
-              </p>
-            </div>
-            <AlertCircle className="w-10 h-10 text-orange-600 bg-orange-100 p-2 rounded-lg" />
-          </div>
-        </div>
-      </div>
-
-      {upcomingMeetings.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 bg-blue-50">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-blue-600" />
-              Réunions à venir
-            </h2>
-          </div>
-          <div className="p-6 space-y-4">
-            {upcomingMeetings.map((meeting) => {
-              const daysUntil = Math.ceil(
-                (new Date(meeting.date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-              );
-              const isToday = daysUntil === 0;
-              const isSoon = daysUntil <= 2 && daysUntil > 0;
-
-              return (
-                <div
-                  key={meeting.id}
-                  className={`border-2 rounded-xl p-6 ${
-                    isToday ? 'border-blue-500 bg-blue-50' : isSoon ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200 bg-white'
-                  }`}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Type</label>
+                <FormSelect
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value as ScrumMeetingType | 'all')}
+                  wrapperClassName="min-w-[160px]"
+                  size="sm"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="font-mono text-sm text-gray-500">#{meeting.number}</span>
-                        <h3 className="text-lg font-bold text-gray-900">{meeting.title}</h3>
-                        {isToday && (
-                          <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded-full font-semibold">AUJOURD&apos;HUI</span>
-                        )}
-                        {isSoon && (
-                          <span className="px-2 py-1 bg-yellow-600 text-white text-xs rounded-full font-semibold">DANS {daysUntil}J</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-6 text-sm text-gray-600 flex-wrap">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          {new Date(meeting.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          {meeting.time} ({meeting.duration} min)
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Users className="w-4 h-4" />
-                          {meeting.participants} participants
-                        </span>
-                      </div>
-                      <div className="mt-3 flex items-center gap-2">
-                        <span className="px-3 py-1 bg-purple-100 text-purple-800 text-xs rounded-full border border-purple-200 font-medium inline-flex items-center gap-1">
-                          <FileText className="w-3 h-3" />
-                          Rédacteur : {meeting.writerName}
-                        </span>
-                        <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">{meeting.projectName}</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => openReport(meeting)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                      >
-                        <Edit className="w-4 h-4" />
-                        Rédiger CR
-                      </button>
-                      <button
-                        onClick={() => openView(meeting)}
-                        className="p-2 hover:bg-gray-100 rounded-lg"
-                        aria-label="Voir"
-                      >
-                        <Eye className="w-4 h-4 text-gray-600" />
-                      </button>
-                    </div>
-                  </div>
-                  {meeting.writerName === currentWriterName && (
-                    <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                      <div className="flex items-start gap-2">
-                        <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-yellow-900">Vous êtes le rédacteur de cette réunion</p>
-                          <p className="text-xs text-yellow-700 mt-1 flex items-center gap-1 flex-wrap">
-                            {daysUntil === 0 ? (
-                              <>
-                                <FileText className="w-3 h-3" />
-                                Trame prête, remplissez pendant la réunion
-                              </>
-                            ) : daysUntil === 1 ? (
-                              <>
-                                <AlertTriangle className="w-3 h-3" />
-                                Demain : préparez-vous à rédiger le CR
-                              </>
-                            ) : (
-                              `Rédaction du CR dans ${daysUntil} jours`
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                  <option value="all">Tous les types</option>
+                  {(Object.keys(SCRUM_MEETING_LABELS) as ScrumMeetingType[]).map((t) => (
+                    <option key={t} value={t}>
+                      {SCRUM_MEETING_LABELS[t]}
+                    </option>
+                  ))}
+                </FormSelect>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Du</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50/50 w-full min-w-[140px]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Au</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50/50 w-full min-w-[140px]"
+                />
+              </div>
+              {(dateFrom || dateTo || typeFilter !== 'all' || searchQuery) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDateFrom('');
+                    setDateTo('');
+                    setTypeFilter('all');
+                    setSearchQuery('');
+                  }}
+                  className="text-sm text-indigo-600 hover:text-indigo-800 font-medium px-2 py-2"
+                >
+                  Effacer
+                </button>
+              )}
+            </div>
+          </ViewFilterPanel>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-gray-600" />
-            Historique des comptes rendus
-          </h2>
-        </div>
-        <TableWrap>
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Réunion</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rédacteur</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Décisions</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {pastMeetings.map((meeting) => (
-                <tr key={meeting.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm text-gray-500">#{meeting.number}</span>
-                      <div>
-                        <div className="font-medium text-gray-900">{meeting.title}</div>
-                        <div className="text-xs text-gray-500">{meeting.projectName}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {new Date(meeting.date).toLocaleDateString('fr-FR')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{meeting.writerName}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full font-medium">
-                      {meeting.decisions} décisions
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
-                      {meeting.actions} actions
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(meeting.status)}`}>
-                      {meeting.status === 'completed' ? 'Publié' : 'En cours'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex gap-1">
-                      <button onClick={() => openView(meeting)} className="p-2 hover:bg-gray-100 rounded transition-colors" aria-label="Voir">
-                        <Eye className="w-4 h-4 text-gray-600" />
-                      </button>
-                      <button onClick={() => deleteMeeting(meeting.id)} className="p-2 hover:bg-red-50 rounded transition-colors" aria-label="Supprimer">
-                        <Trash2 className="w-4 h-4 text-red-600" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+          {listTab === 'overview' && upcomingMeetings.length > 0 && (
+            <section className="space-y-4">
+              <ViewSectionTitle icon={Sparkles} title="Cérémonies à venir" count={upcomingMeetings.length} />
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                {upcomingMeetings.map((meeting) => (
+                  <MeetingCard
+                    key={meeting.id}
+                    meeting={meeting}
+                    highlight={meeting.writerName === currentWriterName}
+                    onView={() => openView(meeting)}
+                    onReport={() => openReport(meeting)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section className="space-y-4">
+            <ViewSectionTitle
+              icon={Filter}
+              title={listTab === 'reports' ? 'Historique des comptes rendus' : 'Toutes les réunions'}
+              count={listTab === 'reports' ? publishedReports.length : filteredMeetings.length}
+            />
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+              {(listTab === 'reports' ? publishedReports : filteredMeetings).map((meeting) => (
+                <MeetingCard
+                  key={meeting.id}
+                  meeting={meeting}
+                  highlight={meeting.writerName === currentWriterName && meeting.status === 'planned'}
+                  onView={() => openView(meeting)}
+                  onReport={() => openReport(meeting)}
+                  onDelete={listTab === 'reports' ? () => deleteMeeting(meeting.id) : undefined}
+                />
               ))}
-            </tbody>
-          </table>
-        </TableWrap>
-      </div>
+              {(listTab === 'reports' ? publishedReports : filteredMeetings).length === 0 && (
+                <div className="col-span-full">
+                  <ViewEmptyState
+                    icon={Calendar}
+                    title="Aucune réunion ne correspond aux filtres"
+                    description="Planifiez une cérémonie depuis l'en-tête"
+                  />
+                </div>
+              )}
+            </div>
+          </section>
+        </>
+      )}
     </ViewShell>
   );
 }

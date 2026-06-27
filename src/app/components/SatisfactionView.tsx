@@ -83,6 +83,32 @@ const emptySurveyForm = {
   status: 'new' as SurveyResponse['status'],
 };
 
+function getSentimentIcon(sentiment: string) {
+  switch (sentiment) {
+    case 'positive':
+      return <Smile className="w-5 h-5 text-green-600" />;
+    case 'neutral':
+      return <Meh className="w-5 h-5 text-yellow-600" />;
+    case 'negative':
+      return <Frown className="w-5 h-5 text-red-600" />;
+    default:
+      return null;
+  }
+}
+
+function getSentimentColor(sentiment: string) {
+  switch (sentiment) {
+    case 'positive':
+      return 'bg-green-100 text-green-700';
+    case 'neutral':
+      return 'bg-yellow-100 text-yellow-700';
+    case 'negative':
+      return 'bg-red-100 text-red-700';
+    default:
+      return 'bg-gray-100 text-gray-700';
+  }
+}
+
 export function SatisfactionView() {
   const { matchesProject, activeProjectSlug } = useProjectContext();
   const [activePhase, setActivePhase] = useState<SurveyPhase | 'all'>('all');
@@ -400,32 +426,6 @@ export function SatisfactionView() {
     },
   ];
 
-  const getSentimentIcon = (sentiment: string) => {
-    switch (sentiment) {
-      case 'positive':
-        return <Smile className="w-5 h-5 text-green-600" />;
-      case 'neutral':
-        return <Meh className="w-5 h-5 text-yellow-600" />;
-      case 'negative':
-        return <Frown className="w-5 h-5 text-red-600" />;
-      default:
-        return null;
-    }
-  };
-
-  const getSentimentColor = (sentiment: string) => {
-    switch (sentiment) {
-      case 'positive':
-        return 'bg-green-100 text-green-700';
-      case 'neutral':
-        return 'bg-yellow-100 text-yellow-700';
-      case 'negative':
-        return 'bg-red-100 text-red-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
-    }
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'new':
@@ -469,11 +469,13 @@ export function SatisfactionView() {
     <ViewShell>
       <ViewHeader
         title="Satisfaction Client & Feedback"
-        subtitle="Écoute continue, analyse automatique et amélioration • ISO §9.1.2"
+        subtitle="Écoute continue, analyse automatique et amélioration — ISO §9.1.2"
+        badge="Feedback · Clients"
+        theme="emerald"
         actions={
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <ActionButton variant="secondary" icon={Download}>Export satisfaction</ActionButton>
-            <ActionButton icon={Plus} onClick={openCreateSurvey} className="bg-green-600 hover:bg-green-700">Nouveau sondage</ActionButton>
+            <ActionButton icon={Plus} onClick={openCreateSurvey} className="!bg-green-600 hover:!bg-green-700 !text-white">Nouveau sondage</ActionButton>
           </div>
         }
       />

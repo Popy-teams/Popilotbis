@@ -13,10 +13,20 @@ import {
   DEMO_TASKS_BY_PROJECT,
   DEMO_VEILLE_BY_PROJECT,
 } from '../data/multiProjectDemoFixtures';
+import {
+  DEMO_GANTT_IDS,
+  DEMO_MEETING_IDS,
+  DEMO_MEETING_TASK_IDS,
+  INITIAL_GANTT_ITEMS,
+  MEETING_DEMO_TASKS,
+  POPY_MEETING_DEMO,
+} from '../data/meetingDemoData';
+import { GANTT_STORAGE_KEY, MEETINGS_STORAGE_KEY } from '../data/initialMeetings';
+import { TASKS_STORAGE_KEY } from './pipelineSync';
 import { mergeDemoData } from './demoDataMerge';
 
 const SEED_VERSION_KEY = 'popilot:demo-seed-version';
-const CURRENT_SEED_VERSION = '4';
+const CURRENT_SEED_VERSION = '7';
 
 function mergeStorage<T extends { id: string | number }>(key: string, incoming: T[]) {
   if (incoming.length === 0) return;
@@ -32,15 +42,44 @@ function mergeStorage<T extends { id: string | number }>(key: string, incoming: 
   }
 }
 
+/** Remplace les entrées démo par id (pour rafraîchir les fixtures sans effacer les données user) */
+function upsertByIds<T extends { id: string | number }>(
+  key: string,
+  incoming: T[],
+  replaceIds: readonly string[]
+) {
+  if (incoming.length === 0) return;
+  try {
+    const raw = localStorage.getItem(key);
+    const existing: T[] = raw ? JSON.parse(raw) : [];
+    const replace = new Set(replaceIds);
+    const kept = existing.filter((item) => !replace.has(String(item.id)));
+    const incomingMap = new Map(incoming.map((item) => [String(item.id), item]));
+    const upserted = [...incoming];
+    for (const item of kept) {
+      if (!incomingMap.has(String(item.id))) upserted.push(item);
+    }
+    localStorage.setItem(key, JSON.stringify(upserted));
+  } catch {
+    localStorage.setItem(key, JSON.stringify(incoming));
+  }
+}
+
+function seedMeetingDemoBundle() {
+  upsertByIds(MEETINGS_STORAGE_KEY, POPY_MEETING_DEMO, DEMO_MEETING_IDS);
+  upsertByIds(TASKS_STORAGE_KEY, MEETING_DEMO_TASKS, DEMO_MEETING_TASK_IDS);
+  upsertByIds(GANTT_STORAGE_KEY, INITIAL_GANTT_ITEMS, DEMO_GANTT_IDS);
+}
+
 /** Injecte les fixtures multi-projets (idempotent, sans écraser les données existantes). */
 export function seedMultiProjectDemoData() {
   try {
     const version = localStorage.getItem(SEED_VERSION_KEY);
     if (version === CURRENT_SEED_VERSION) return;
 
-    mergeStorage('popilot:tasks-local', [...TEST_TASKS, ...DEMO_TASKS_BY_PROJECT]);
+    mergeStorage(TASKS_STORAGE_KEY, [...TEST_TASKS, ...DEMO_TASKS_BY_PROJECT]);
     mergeStorage('popilot:risks-local', DEMO_RISKS_BY_PROJECT);
-    mergeStorage('popilot:meetings-local', DEMO_MEETINGS_BY_PROJECT);
+    mergeStorage(MEETINGS_STORAGE_KEY, DEMO_MEETINGS_BY_PROJECT);
     mergeStorage('popilot:pipeline-local', [...INITIAL_PIPELINE, ...DEMO_PIPELINE_BY_PROJECT]);
     mergeStorage('popilot:docs-local', INITIAL_DOCUMENTS);
     mergeStorage('popilot:veille-local', DEMO_VEILLE_BY_PROJECT);
@@ -52,6 +91,8 @@ export function seedMultiProjectDemoData() {
       'popilot:calendar-events',
       DEMO_CALENDAR_BY_PROJECT.map((e) => ({ ...e, date: e.date }))
     );
+
+    seedMeetingDemoBundle();
 
     localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION);
   } catch {

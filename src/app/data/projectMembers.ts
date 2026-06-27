@@ -7,7 +7,6 @@ export interface PortfolioMember {
 }
 
 export const PORTFOLIO_MEMBERS: PortfolioMember[] = [
-  { id: 'user-shirel', name: 'Shirel', initials: 'SH', email: 'shirel@popy-robot.com' },
   { id: 'user-sonia', name: 'Sonia Laurent', initials: 'SO', email: 'sonia@popilot.com' },
   { id: 'user-1', name: 'Alice Martin', initials: 'AM', email: 'alice@popilot.com' },
   { id: 'user-2', name: 'Bob Dupont', initials: 'BD', email: 'bob@popilot.com' },

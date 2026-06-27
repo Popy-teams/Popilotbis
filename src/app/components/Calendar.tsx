@@ -16,22 +16,29 @@ import {
 } from 'lucide-react';
 import { PageBackHeader } from './shared/PageBackHeader';
 import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton } from './shared';
+import { MeetingGanttPanel } from './meetings/MeetingGanttPanel';
+import { loadGanttItems, CALENDAR_STORAGE_KEY } from '../utils/meetingSync';
+import type { GanttItem } from '../types/scrumMeetings';
 
 interface CalendarEvent {
   id: string;
   projectId?: string;
   title: string;
   date: Date;
-  type: 'meeting' | 'deadline' | 'event';
+  type: 'meeting' | 'deadline' | 'event' | 'gantt-bar';
   time?: string;
+  endDate?: string;
   participants?: string[];
   description?: string;
   priority?: 'low' | 'medium' | 'high';
+  linkedMeetingId?: string;
+  linkedTaskId?: string;
+  source?: 'manual' | 'meeting-sync';
 }
 
-type PageMode = 'calendar' | 'create' | 'view' | 'edit';
+type PageMode = 'calendar' | 'gantt' | 'create' | 'view' | 'edit';
 
-const STORAGE_KEY = 'popilot:calendar-events';
+const STORAGE_KEY = CALENDAR_STORAGE_KEY;
 
 const DEFAULT_EVENTS: CalendarEvent[] = [
   {
@@ -72,7 +79,7 @@ const DEFAULT_EVENTS: CalendarEvent[] = [
 const emptyForm = {
   title: '',
   date: '',
-  type: 'meeting' as 'meeting' | 'deadline' | 'event',
+  type: 'meeting' as CalendarEvent['type'],
   time: '',
   description: '',
   priority: 'medium' as 'low' | 'medium' | 'high',
@@ -84,10 +91,12 @@ function serializeEvents(events: CalendarEvent[]) {
 
 function deserializeEvents(raw: unknown): CalendarEvent[] {
   if (!Array.isArray(raw)) return DEFAULT_EVENTS;
-  return raw.map((e) => ({
-    ...e,
-    date: new Date(e.date),
-  }));
+  return raw
+    .map((e) => ({
+      ...e,
+      date: new Date(e.date),
+    }))
+    .filter((e) => !Number.isNaN(e.date.getTime()));
 }
 
 function formatDateInput(date: Date) {
@@ -105,6 +114,8 @@ function getTypeLabel(type: CalendarEvent['type']) {
       return 'Échéance';
     case 'event':
       return 'Événement';
+    case 'gantt-bar':
+      return 'Gantt (réunion)';
   }
 }
 
@@ -122,15 +133,16 @@ function getPriorityLabel(priority: CalendarEvent['priority']) {
 }
 
 export function Calendar() {
-  const { matchesProject, activeProjectSlug } = useProjectContext();
+  const { matchesProject, activeProjectSlug, activeProject } = useProjectContext();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [pageMode, setPageMode] = useState<PageMode>('calendar');
   const [events, setEvents] = useState<CalendarEvent[]>(DEFAULT_EVENTS);
+  const [ganttItems, setGanttItems] = useState<GanttItem[]>(() => loadGanttItems());
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [form, setForm] = useState(emptyForm);
 
-  useEffect(() => {
+  const reloadEvents = () => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const saved = raw ? deserializeEvents(JSON.parse(raw)) : [];
@@ -139,18 +151,44 @@ export function Calendar() {
         date: new Date(e.date),
       }));
       setEvents(mergeDemoData(saved, demoEvents, DEFAULT_EVENTS));
-    } catch {}
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    reloadEvents();
   }, []);
 
   useEffect(() => {
+    const refresh = () => {
+      reloadEvents();
+      setGanttItems(loadGanttItems());
+    };
+    window.addEventListener('popilot:calendar-updated', refresh);
+    window.addEventListener('popilot:gantt-updated', refresh);
+    return () => {
+      window.removeEventListener('popilot:calendar-updated', refresh);
+      window.removeEventListener('popilot:gantt-updated', refresh);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (pageMode === 'create' || pageMode === 'edit') return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeEvents(events)));
+      const manual = events.filter((e) => e.source !== 'meeting-sync');
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeEvents(manual)));
     } catch {}
-  }, [events]);
+  }, [events, pageMode]);
 
   const scopedEvents = useMemo(
     () => filterByActiveProject(events, matchesProject),
     [events, matchesProject]
+  );
+
+  const scopedGantt = useMemo(
+    () => ganttItems.filter((g) => matchesProject(g.projectId ?? 'popy')),
+    [ganttItems, matchesProject]
   );
 
   const monthNames = [
@@ -224,6 +262,8 @@ export function Calendar() {
         return 'bg-red-500';
       case 'event':
         return 'bg-green-500';
+      case 'gantt-bar':
+        return 'bg-violet-500';
       default:
         return 'bg-gray-500';
     }
@@ -507,12 +547,46 @@ export function Calendar() {
 
   const days = getDaysInMonth(currentDate);
 
+  if (pageMode === 'gantt') {
+    return (
+      <ViewShell>
+        <ViewHeader
+          title="Planning — Gantt"
+          subtitle="Barres synchronisées depuis les comptes rendus de réunion"
+          badge="Planning · Gantt"
+          theme="violet"
+          actions={
+            <ActionButton variant="secondary" onClick={() => setPageMode('calendar')}>
+              Retour au calendrier
+            </ActionButton>
+          }
+        />
+        <MeetingGanttPanel
+          items={scopedGantt}
+          projectName={activeProject?.name ?? 'Projet'}
+          title={`Gantt — ${activeProject?.name ?? 'Projet'}`}
+        />
+      </ViewShell>
+    );
+  }
+
   return (
     <ViewShell>
       <ViewHeader
         title="Calendrier & Planning"
-        subtitle="Réunions, événements et échéances importantes"
-        actions={<ActionButton icon={Plus} onClick={() => openCreate(selectedDate ?? undefined)}>Nouvel événement</ActionButton>}
+        subtitle="Réunions Scrum, échéances de projet et diagramme de Gantt synchronisé"
+        badge="Planning · Calendrier"
+        theme="violet"
+        actions={
+          <div className="flex gap-2">
+            <ActionButton variant="secondary" onClick={() => setPageMode('gantt')}>
+              Voir le Gantt
+            </ActionButton>
+            <ActionButton icon={Plus} onClick={() => openCreate(selectedDate ?? undefined)}>
+              Nouvel événement
+            </ActionButton>
+          </div>
+        }
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -606,6 +680,10 @@ export function Calendar() {
               <div className="flex items-center gap-3">
                 <div className="w-4 h-4 rounded bg-green-500" />
                 <span className="text-sm text-gray-700">Événements</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-4 h-4 rounded bg-violet-500" />
+                <span className="text-sm text-gray-700">Gantt (sync réunions)</span>
               </div>
             </div>
           </div>

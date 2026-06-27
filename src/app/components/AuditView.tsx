@@ -733,6 +733,8 @@ export function AuditView() {
         <ViewHeader
           title="Audit Global ISO 9001"
           subtitle={activeProject ? `Aucune donnée d'audit pour ${activeProject.name}` : 'Sélectionnez un projet'}
+          badge="Audit · ISO 9001"
+          theme="indigo"
         />
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-600">
           <Award className="w-12 h-12 mx-auto mb-4 text-indigo-400" />
@@ -802,9 +804,11 @@ export function AuditView() {
         title="Audit Global ISO 9001"
         subtitle={
           activeProject
-            ? `Conformité en temps réel • ${activeProject.name}`
-            : 'Conformité en temps réel • Amélioration continue'
+            ? `Conformité en temps réel — ${activeProject.name}`
+            : 'Conformité en temps réel — Amélioration continue'
         }
+        badge="Audit · ISO 9001"
+        theme="indigo"
         actions={
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <ActionButton variant="secondary" icon={Download} onClick={() => setPageMode('export')}>Export rapport audit</ActionButton>

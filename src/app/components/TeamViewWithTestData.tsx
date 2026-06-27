@@ -1,211 +1,457 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  Plus,
+  Mail,
+  Phone,
+  Award,
+  Users,
+  Pencil,
+  Trash2,
+  Eye,
+  Briefcase,
+  Brain,
+  Shield,
+  Cloud,
+  Cpu,
+  Sparkles,
+  CheckCircle2,
+  AlertTriangle,
+  TrendingUp,
+} from 'lucide-react';
 import { useProjectContext } from '../context/ProjectContext';
 import { filterByActiveProject } from '../utils/projectMatch';
-import { Plus, Mail, Phone, Award, Upload, Users, Pencil, Trash2, Eye, Check, ClipboardList, GraduationCap, Bell } from 'lucide-react';
-import { TEST_TEAM_MEMBERS, calculateMemberWorkload, getCategories, type TeamMemberData } from '../data/testTeamData';
+import { TEST_TEAM_MEMBERS, type TeamMemberData } from '../data/testTeamData';
 import { TEST_TASKS } from '../data/testData';
+import { DEMO_TASKS_BY_PROJECT } from '../data/multiProjectDemoFixtures';
+import { mergeDemoData } from '../utils/demoDataMerge';
+import { TASKS_STORAGE_KEY } from '../utils/pipelineSync';
+import {
+  INITIAL_TEAM_POSITIONS,
+  POSITIONS_STORAGE_KEY,
+  applyPositionToMember,
+  getPositionById,
+  getPositionCategories,
+  type TeamPosition,
+} from '../data/teamPositions';
+import {
+  computeMemberWorkloads,
+  countAssignedTasks,
+  workloadBarClass,
+  workloadColorClass,
+  workloadLabel,
+} from '../utils/teamWorkload';
+import type { TestTask } from '../data/testData';
 import { PageBackHeader } from './shared/PageBackHeader';
-import { TestModeBadge } from './shared/displayHelpers';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton } from './shared';
+import {
+  ViewShell,
+  ActionButton,
+  ViewHero,
+  ViewStatCard,
+  ViewStatsGrid,
+  ViewTabPills,
+  ViewTabBtn,
+} from './shared';
+import {
+  MemberFormPage,
+  emptyMemberForm,
+  type MemberFormValues,
+} from './team/MemberFormPage';
+import {
+  PositionFormPage,
+  emptyPositionForm,
+  formValuesToPosition,
+  positionToFormValues,
+  type PositionFormValues,
+} from './team/PositionFormPage';
 
-type PageMode = 'list' | 'create' | 'view' | 'edit';
+const TEAM_STORAGE_KEY = 'popilot:team-local';
 
-const emptyForm = {
-  name: '',
-  email: '',
-  phone: '',
-  role: '',
-  category: 'Direction & Coordination',
-  photoUrl: '',
-};
+type MainTab = 'members' | 'positions';
+type MemberMode = 'list' | 'create' | 'view' | 'edit';
+type PositionMode = 'list' | 'create' | 'edit';
+
+function normalizeStoredMember(raw: Partial<TeamMemberData>): TeamMemberData {
+  const fallback =
+    TEST_TEAM_MEMBERS.find((m) => m.id === raw.id) ??
+    TEST_TEAM_MEMBERS.find((m) => m.email === raw.email);
+  const positionId =
+    raw.positionId && raw.positionId.length > 0
+      ? raw.positionId
+      : fallback?.positionId ?? INITIAL_TEAM_POSITIONS[0]?.id ?? 'pos-po';
+
+  return {
+    id: raw.id ?? fallback?.id ?? `user-${Date.now()}`,
+    projectId: raw.projectId ?? fallback?.projectId ?? 'popy',
+    positionId,
+    tasksUserId: raw.tasksUserId ?? fallback?.tasksUserId,
+    name: raw.name ?? fallback?.name ?? 'Membre',
+    initials: raw.initials ?? fallback?.initials ?? '??',
+    role: raw.role ?? fallback?.role ?? 'Membre',
+    category: raw.category ?? fallback?.category ?? 'Direction & Coordination',
+    email: raw.email ?? fallback?.email ?? '',
+    phone: raw.phone ?? fallback?.phone,
+    photoUrl: raw.photoUrl ?? fallback?.photoUrl,
+    workload: raw.workload ?? 0,
+    responsibilities: raw.responsibilities ?? fallback?.responsibilities ?? [],
+    skills: raw.skills ?? fallback?.skills ?? [],
+    availability: raw.availability ?? fallback?.availability ?? 'Disponible',
+    trophies: raw.trophies ?? fallback?.trophies ?? [],
+  };
+}
+
+function memberToForm(member: TeamMemberData): MemberFormValues {
+  return {
+    name: member.name,
+    email: member.email,
+    phone: member.phone ?? '',
+    positionId: member.positionId,
+    photoUrl: member.photoUrl ?? '',
+  };
+}
 
 export function TeamViewWithTestData() {
-  const { matchesProject, activeProjectSlug } = useProjectContext();
-  const [pageMode, setPageMode] = useState<PageMode>('list');
+  const { matchesProject, activeProjectSlug, activeProject } = useProjectContext();
+  const [mainTab, setMainTab] = useState<MainTab>('members');
+  const [memberMode, setMemberMode] = useState<MemberMode>('list');
+  const [positionMode, setPositionMode] = useState<PositionMode>('list');
   const [members, setMembers] = useState<TeamMemberData[]>(TEST_TEAM_MEMBERS);
+  const [positions, setPositions] = useState<TeamPosition[]>(INITIAL_TEAM_POSITIONS);
+  const [tasks, setTasks] = useState<TestTask[]>(TEST_TASKS);
   const [selectedMember, setSelectedMember] = useState<TeamMemberData | null>(null);
+  const [selectedPosition, setSelectedPosition] = useState<TeamPosition | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [form, setForm] = useState(emptyForm);
+  const [memberForm, setMemberForm] = useState<MemberFormValues>(emptyMemberForm());
+  const [positionForm, setPositionForm] = useState<PositionFormValues>(emptyPositionForm());
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('popilot:team-local');
-      if (raw) setMembers(JSON.parse(raw));
-    } catch {}
+      const raw = localStorage.getItem(TEAM_STORAGE_KEY);
+      if (raw) {
+        const parsed = (JSON.parse(raw) as Partial<TeamMemberData>[])
+          .filter((m) => m.id !== 'user-shirel')
+          .map((m) => normalizeStoredMember(m));
+        setMembers(parsed.length ? parsed : TEST_TEAM_MEMBERS);
+      }
+    } catch {
+      // ignore
+    }
+    try {
+      const rawPos = localStorage.getItem(POSITIONS_STORAGE_KEY);
+      if (rawPos) setPositions(JSON.parse(rawPos));
+      else localStorage.setItem(POSITIONS_STORAGE_KEY, JSON.stringify(INITIAL_TEAM_POSITIONS));
+    } catch {
+      // ignore
+    }
+    try {
+      const rawTasks = localStorage.getItem(TASKS_STORAGE_KEY);
+      const saved = rawTasks ? (JSON.parse(rawTasks) as TestTask[]) : [];
+      setTasks(mergeDemoData(saved, DEMO_TASKS_BY_PROJECT, TEST_TASKS));
+    } catch {
+      // ignore
+    }
   }, []);
 
   useEffect(() => {
     try {
-      localStorage.setItem('popilot:team-local', JSON.stringify(members));
-    } catch {}
+      localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(members));
+    } catch {
+      // ignore
+    }
   }, [members]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(POSITIONS_STORAGE_KEY, JSON.stringify(positions));
+    } catch {
+      // ignore
+    }
+  }, [positions]);
 
   const scopedMembers = useMemo(
     () => filterByActiveProject(members, matchesProject),
     [members, matchesProject]
   );
 
-  const totalTasks = TEST_TASKS.length;
-  const membersWithWorkload = scopedMembers.map((member) => ({
-    ...member,
-    workload: calculateMemberWorkload(member.id, totalTasks),
-  }));
+  const scopedPositions = useMemo(
+    () => filterByActiveProject(positions, matchesProject),
+    [positions, matchesProject]
+  );
 
-  const categories = getCategories();
+  const projectTasks = useMemo(
+    () => tasks.filter((t) => matchesProject(t.projectId)),
+    [tasks, matchesProject]
+  );
+
+  const workloads = useMemo(
+    () => computeMemberWorkloads(projectTasks, scopedMembers),
+    [projectTasks, scopedMembers]
+  );
+
+  const membersEnriched = useMemo(
+    () =>
+      scopedMembers.map((member) => ({
+        ...member,
+        workload: workloads[member.id] ?? 0,
+        availability:
+          member.availability === 'En congé'
+            ? ('En congé' as const)
+            : workloadLabel(workloads[member.id] ?? 0),
+        taskCount: countAssignedTasks(projectTasks, member),
+      })),
+    [scopedMembers, workloads, projectTasks]
+  );
+
+  const categories = getPositionCategories(scopedPositions);
   const filteredMembers = selectedCategory
-    ? membersWithWorkload.filter((m) => m.category === selectedCategory)
-    : membersWithWorkload;
+    ? membersEnriched.filter((m) => m.category === selectedCategory)
+    : membersEnriched;
 
-  const getWorkloadColor = (workload: number) => {
-    if (workload >= 80) return 'text-red-600 bg-red-100';
-    if (workload >= 50) return 'text-yellow-600 bg-yellow-100';
-    return 'text-green-600 bg-green-100';
+  const buildMember = (values: MemberFormValues, base?: TeamMemberData): TeamMemberData | null => {
+    const position = getPositionById(scopedPositions, values.positionId);
+    if (!position) return null;
+    const fromPosition = applyPositionToMember(position);
+    return {
+      id: base?.id ?? `user-${Date.now()}`,
+      projectId: base?.projectId ?? activeProjectSlug ?? 'popy',
+      positionId: position.id,
+      name: values.name.trim(),
+      initials: values.name
+        .split(' ')
+        .map((w) => w[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase(),
+      role: fromPosition.role,
+      category: fromPosition.category,
+      email: values.email.trim(),
+      phone: values.phone.trim() || undefined,
+      photoUrl: values.photoUrl || base?.photoUrl,
+      workload: 0,
+      responsibilities: base?.responsibilities ?? [],
+      skills: fromPosition.skills,
+      availability: base?.availability ?? 'Disponible',
+      trophies: base?.trophies ?? [],
+    };
   };
 
-  const getAvailabilityColor = (availability: string) => {
-    if (availability === 'Surchargé') return 'bg-red-100 text-red-700 border-red-300';
-    if (availability === 'En congé') return 'bg-gray-100 text-gray-700 border-gray-300';
-    return 'bg-green-100 text-green-700 border-green-300';
-  };
-
-  const toMember = (base?: TeamMemberData): TeamMemberData => ({
-    id: base?.id ?? `user-${Date.now()}`,
-    name: form.name,
-    initials: form.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase(),
-    role: form.role,
-    category: form.category,
-    email: form.email,
-    phone: form.phone,
-    photoUrl: form.photoUrl || base?.photoUrl,
-    workload: base?.workload ?? 0,
-    assignedTasks: base?.assignedTasks ?? [],
-    responsibilities: base?.responsibilities ?? [],
-    skills: base?.skills ?? [],
-    availability: base?.availability ?? 'Disponible',
-    trophies: base?.trophies ?? [],
-    projectId: base?.projectId ?? activeProjectSlug ?? 'popy',
-  });
-
-  const submitForm = (e: React.FormEvent) => {
+  const submitMember = (e: React.FormEvent) => {
     e.preventDefault();
-    const next = toMember(pageMode === 'edit' ? selectedMember ?? undefined : undefined);
-    if (pageMode === 'create') {
+    const next = buildMember(memberForm, memberMode === 'edit' ? selectedMember ?? undefined : undefined);
+    if (!next) return;
+    if (memberMode === 'create') {
       setMembers((prev) => [...prev, next]);
+      setMemberMode('list');
     } else {
       setMembers((prev) => prev.map((m) => (m.id === next.id ? next : m)));
       setSelectedMember(next);
+      setMemberMode('view');
     }
-    setPageMode('list');
-    setForm(emptyForm);
+    setMemberForm(emptyMemberForm());
     setPhotoPreview(null);
+  };
+
+  const submitPosition = (e: React.FormEvent) => {
+    e.preventDefault();
+    const base = positionMode === 'edit' && selectedPosition
+      ? { id: selectedPosition.id, projectId: selectedPosition.projectId }
+      : { id: `pos-${Date.now()}`, projectId: activeProjectSlug ?? 'popy' };
+    const next = formValuesToPosition(positionForm, base);
+    if (positionMode === 'create') {
+      setPositions((prev) => [...prev, next]);
+    } else {
+      setPositions((prev) => prev.map((p) => (p.id === next.id ? next : p)));
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.positionId === next.id
+            ? { ...m, ...applyPositionToMember(next), positionId: next.id }
+            : m
+        )
+      );
+    }
+    setPositionMode('list');
+    setPositionForm(emptyPositionForm());
+    setSelectedPosition(null);
   };
 
   const removeMember = (id: string) => {
     setMembers((prev) => prev.filter((m) => m.id !== id));
     setSelectedMember(null);
-    setPageMode('list');
+    setMemberMode('list');
+  };
+
+  const removePosition = (id: string) => {
+    if (members.some((m) => m.positionId === id)) {
+      alert('Ce poste est assigné à un ou plusieurs membres. Réassignez-les avant de supprimer.');
+      return;
+    }
+    setPositions((prev) => prev.filter((p) => p.id !== id));
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setPhotoPreview(result);
-        setForm({ ...form, photoUrl: result });
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setPhotoPreview(result);
+      setMemberForm((prev) => ({ ...prev, photoUrl: result }));
+    };
+    reader.readAsDataURL(file);
   };
 
-  const memberFormPage = (
-    <ViewShell narrow>
-      <PageBackHeader
-        title={pageMode === 'create' ? 'Ajouter un membre' : 'Modifier le membre'}
-        subtitle={<TestModeBadge />}
-        onBack={() => setPageMode(selectedMember ? 'view' : 'list')}
-      />
-      <form onSubmit={submitForm} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5 shadow-sm">
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Photo de profil</label>
-          <div className="flex items-center gap-4">
-            {photoPreview || form.photoUrl ? (
-              <img src={photoPreview || form.photoUrl} alt="" className="w-20 h-20 rounded-full object-cover" />
-            ) : (
-              <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center"><Upload className="w-8 h-8 text-gray-500" /></div>
-            )}
-            <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg">
-              <Upload className="w-4 h-4" /> Choisir une photo
-              <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
-            </label>
-          </div>
-        </div>
-        {(['name', 'email', 'phone', 'role'] as const).map((field) => (
-          <div key={field}>
-            <label className="block text-sm font-semibold text-gray-700 mb-1 capitalize">{field === 'name' ? 'Nom complet *' : field === 'email' ? 'Email *' : field === 'role' ? 'Role *' : 'Telephone'}</label>
-            <input
-              type={field === 'email' ? 'email' : field === 'phone' ? 'tel' : 'text'}
-              required={field === 'name' || field === 'email' || field === 'role'}
-              value={form[field]}
-              onChange={(e) => setForm({ ...form, [field]: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-        ))}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1">Categorie *</label>
-          <select required value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg">
-            {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-          </select>
-        </div>
-        <div className="flex gap-3">
-          <button type="button" onClick={() => setPageMode(selectedMember ? 'view' : 'list')} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg">Annuler</button>
-          <button type="submit" className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">{pageMode === 'create' ? 'Ajouter' : 'Enregistrer'}</button>
-        </div>
-      </form>
-    </ViewShell>
-  );
-
-  if (pageMode === 'create' || pageMode === 'edit') return memberFormPage;
-
-  if (pageMode === 'view' && selectedMember) {
-    const m = membersWithWorkload.find((x) => x.id === selectedMember.id) ?? selectedMember;
+  if (memberMode === 'create' || memberMode === 'edit') {
     return (
-      <ViewShell narrow>
+      <MemberFormPage
+        mode={memberMode}
+        values={memberForm}
+        positions={scopedPositions}
+        photoPreview={photoPreview}
+        submitLabel={memberMode === 'create' ? 'Créer le membre' : 'Enregistrer'}
+        onBack={() => setMemberMode(selectedMember ? 'view' : 'list')}
+        onSubmit={submitMember}
+        onChange={setMemberForm}
+        onPhotoUpload={handlePhotoUpload}
+      />
+    );
+  }
+
+  if (positionMode === 'create' || positionMode === 'edit') {
+    return (
+      <PositionFormPage
+        mode={positionMode}
+        values={positionForm}
+        categories={categories}
+        submitLabel={positionMode === 'create' ? 'Créer le poste' : 'Enregistrer'}
+        onBack={() => {
+          setPositionMode('list');
+          setSelectedPosition(null);
+        }}
+        onSubmit={submitPosition}
+        onChange={setPositionForm}
+      />
+    );
+  }
+
+  if (memberMode === 'view' && selectedMember) {
+    const m = membersEnriched.find((x) => x.id === selectedMember.id) ?? {
+      ...selectedMember,
+      workload: workloads[selectedMember.id] ?? 0,
+      taskCount: countAssignedTasks(projectTasks, selectedMember),
+    };
+    const position = getPositionById(scopedPositions, m.positionId);
+    return (
+      <ViewShell>
         <PageBackHeader
           title={m.name}
-          subtitle={<span className="text-indigo-600 font-medium">{m.role}</span>}
-          onBack={() => { setPageMode('list'); setSelectedMember(null); }}
+          subtitle={m.role}
+          onBack={() => {
+            setMemberMode('list');
+            setSelectedMember(null);
+          }}
           actions={
-            <div className="flex gap-2">
-              <button type="button" onClick={() => { setForm({ name: m.name, email: m.email, phone: m.phone ?? '', role: m.role, category: m.category, photoUrl: m.photoUrl ?? '' }); setPhotoPreview(m.photoUrl ?? null); setPageMode('edit'); }} className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50"><Pencil className="w-4 h-4" /> Modifier</button>
-              <button type="button" onClick={() => removeMember(m.id)} className="inline-flex items-center gap-2 px-4 py-2 border border-red-200 text-red-700 rounded-lg hover:bg-red-50"><Trash2 className="w-4 h-4" /> Supprimer</button>
+            <div className="flex flex-wrap gap-2">
+              <ActionButton
+                variant="secondary"
+                icon={Pencil}
+                onClick={() => {
+                  setMemberForm(memberToForm(m));
+                  setPhotoPreview(m.photoUrl ?? null);
+                  setMemberMode('edit');
+                }}
+              >
+                Modifier
+              </ActionButton>
+              <ActionButton
+                variant="danger"
+                icon={Trash2}
+                onClick={() => removeMember(m.id)}
+              >
+                Supprimer
+              </ActionButton>
             </div>
           }
         />
-        <div className="bg-white rounded-xl border p-6 space-y-4">
-          <div className="flex items-center gap-4">
-            {m.photoUrl ? <img src={m.photoUrl} alt="" className="w-20 h-20 rounded-full" /> : <div className="w-20 h-20 rounded-full bg-indigo-600 text-white flex items-center justify-center text-2xl font-bold">{m.initials}</div>}
-            <div>
-              <span className={`inline-block px-2 py-1 rounded-full text-xs border ${getAvailabilityColor(m.availability)}`}>{m.availability}</span>
-              <p className="text-sm text-gray-600 mt-2 flex items-center gap-2"><Mail className="w-4 h-4" />{m.email}</p>
-              {m.phone && <p className="text-sm text-gray-600 flex items-center gap-2"><Phone className="w-4 h-4" />{m.phone}</p>}
+        <div className="space-y-6">
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-4">
+              {m.photoUrl ? (
+                <img src={m.photoUrl} alt="" className="w-20 h-20 rounded-full object-cover" />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-indigo-600 text-white flex items-center justify-center text-2xl font-bold">
+                  {m.initials}
+                </div>
+              )}
+              <div>
+                <span
+                  className={`inline-block px-2 py-1 rounded-full text-xs border ${
+                    m.availability === 'Surchargé'
+                      ? 'bg-red-100 text-red-700 border-red-200'
+                      : m.availability === 'En congé'
+                        ? 'bg-slate-100 text-slate-600 border-slate-200'
+                        : 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                  }`}
+                >
+                  {m.availability}
+                </span>
+                <p className="text-sm text-slate-600 mt-2 flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  {m.email}
+                </p>
+                {m.phone && (
+                  <p className="text-sm text-slate-600 flex items-center gap-2">
+                    <Phone className="w-4 h-4" />
+                    {m.phone}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-          <div>
-            <p className="text-sm font-semibold mb-1">Charge : {m.workload}%</p>
-            <div className="w-full bg-gray-200 rounded-full h-2"><div className={`h-full rounded-full ${m.workload >= 80 ? 'bg-red-500' : m.workload >= 50 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${m.workload}%` }} /></div>
-          </div>
-          {m.responsibilities.length > 0 && (
-            <div>
-              <h3 className="font-semibold mb-2">Responsabilites</h3>
-              <ul className="text-sm space-y-1">{m.responsibilities.map((r, i) => <li key={i} className="flex gap-2"><span className="text-indigo-500">-</span>{r}</li>)}</ul>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-sm">
+            <p className="text-sm font-semibold text-slate-900 mb-1">Charge de travail</p>
+            <p className="text-xs text-slate-500 mb-3">
+              {m.taskCount} tâche(s) assignée(s) — {m.workload}% par rapport à la moyenne de l&apos;équipe (100 % = charge moyenne)
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${workloadBarClass(m.workload)}`}
+                  style={{ width: `${Math.min(m.workload, 100)}%` }}
+                />
+              </div>
+              <span className={`text-sm font-bold px-2 py-0.5 rounded ${workloadColorClass(m.workload)}`}>
+                {m.workload}%
+              </span>
             </div>
+          </section>
+
+          {position && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                <Briefcase className="w-4 h-4 text-violet-600" />
+                Poste : {position.title}
+              </h3>
+              <p className="text-xs text-slate-500 mb-3">{position.category}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {m.skills.map((s) => (
+                  <span key={s} className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs">
+                    {s}
+                  </span>
+                ))}
+              </div>
+            </section>
           )}
-          {m.skills.length > 0 && (
-            <div className="flex flex-wrap gap-1">{m.skills.map((s, i) => <span key={i} className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs">{s}</span>)}</div>
+
+          {m.trophies && m.trophies.length > 0 && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm flex items-center gap-2 flex-wrap">
+              <Award className="w-4 h-4 text-amber-500" />
+              {m.trophies.map((t) => (
+                <span key={t} className="text-xs bg-amber-50 px-2 py-1 rounded-lg text-amber-800">
+                  {t}
+                </span>
+              ))}
+            </section>
           )}
         </div>
       </ViewShell>
@@ -214,73 +460,451 @@ export function TeamViewWithTestData() {
 
   return (
     <ViewShell>
-      <ViewHeader
-        title="Equipe POPY"
-        subtitle={<span className="flex items-center flex-wrap gap-1">Gerez votre equipe <TestModeBadge /></span>}
+      <ViewHero
+        title="Équipe"
+        subtitle="Membres, postes, compétences et charge de travail relative à la moyenne du projet."
+        badge={`${activeProject?.name ?? 'Projet'} · Ressources`}
+        badgeIcon={Users}
+        theme="cyan"
         actions={
-          <ActionButton icon={Plus} onClick={() => { setForm(emptyForm); setPhotoPreview(null); setPageMode('create'); }} className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 border-0">
-            Ajouter un membre
+          <ActionButton
+            icon={Plus}
+            onClick={() => {
+              if (mainTab === 'members') {
+                setMemberForm(emptyMemberForm(scopedPositions[0]?.id ?? ''));
+                setPhotoPreview(null);
+                setMemberMode('create');
+              } else {
+                setPositionForm(emptyPositionForm());
+                setPositionMode('create');
+              }
+            }}
+          >
+            {mainTab === 'members' ? 'Nouveau membre' : 'Nouveau poste'}
           </ActionButton>
+        }
+        stats={
+          <ViewStatsGrid cols={4}>
+            <ViewStatCard label="Membres" value={String(membersEnriched.length)} gradient="from-cyan-500 to-blue-500" icon={Users} onDark />
+            <ViewStatCard label="Postes" value={String(scopedPositions.length)} gradient="from-violet-500 to-purple-500" icon={Briefcase} onDark />
+            <ViewStatCard
+              label="Surchargés"
+              value={String(membersEnriched.filter((m) => m.workload >= 130).length)}
+              gradient="from-red-500 to-rose-500"
+              icon={AlertTriangle}
+              onDark
+            />
+            <ViewStatCard
+              label="Charge moyenne"
+              value={`${membersEnriched.length ? Math.round(membersEnriched.reduce((a, m) => a + m.workload, 0) / membersEnriched.length) : 0}%`}
+              gradient="from-emerald-500 to-teal-500"
+              icon={TrendingUp}
+              onDark
+            />
+          </ViewStatsGrid>
         }
       />
 
-      <div className={viewGrids.stats4}>
-        <div className="bg-white p-4 rounded-lg border"><div className="text-2xl font-bold">{membersWithWorkload.length}</div><div className="text-sm text-gray-600">Membres</div></div>
-        <div className="bg-green-50 p-4 rounded-lg border border-green-200"><div className="text-2xl font-bold text-green-900">{membersWithWorkload.filter((m) => m.availability === 'Disponible').length}</div><div className="text-sm text-green-700">Disponibles</div></div>
-        <div className="bg-red-50 p-4 rounded-lg border border-red-200"><div className="text-2xl font-bold text-red-900">{membersWithWorkload.filter((m) => m.workload >= 80).length}</div><div className="text-sm text-red-700">Surcharges</div></div>
-        <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200"><div className="text-2xl font-bold text-indigo-900">{categories.length}</div><div className="text-sm text-indigo-700">Categories</div></div>
-      </div>
+      <ViewTabPills>
+        <ViewTabBtn active={mainTab === 'members'} onClick={() => setMainTab('members')} icon={Users}>
+          Membres
+        </ViewTabBtn>
+        <ViewTabBtn active={mainTab === 'positions'} onClick={() => setMainTab('positions')} icon={Briefcase}>
+          Postes
+        </ViewTabBtn>
+      </ViewTabPills>
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <button type="button" onClick={() => setSelectedCategory(null)} className={`px-4 py-2 rounded-lg font-medium ${selectedCategory === null ? 'bg-indigo-600 text-white' : 'bg-white border'}`}><Users className="w-4 h-4 inline mr-2" />Tous</button>
-        {categories.map((category) => (
-          <button key={category} type="button" onClick={() => setSelectedCategory(category)} className={`px-4 py-2 rounded-lg font-medium ${selectedCategory === category ? 'bg-indigo-600 text-white' : 'bg-white border'}`}>{category}</button>
-        ))}
-      </div>
+      {mainTab === 'positions' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {scopedPositions.map((position) => {
+            const assignedMembers = members.filter((m) => m.positionId === position.id);
+            return (
+              <PositionCard
+                key={position.id}
+                position={position}
+                assignedMembers={assignedMembers}
+                onEdit={() => {
+                  setSelectedPosition(position);
+                  setPositionForm(positionToFormValues(position));
+                  setPositionMode('edit');
+                }}
+                onDelete={() => removePosition(position.id)}
+              />
+            );
+          })}
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setSelectedCategory(null)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${selectedCategory === null ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}
+            >
+              Tous
+            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium ${selectedCategory === cat ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
 
-      <div className="space-y-6">
-        {categories.filter((cat) => !selectedCategory || cat === selectedCategory).map((category) => {
-          const categoryMembers = filteredMembers.filter((m) => m.category === category);
-          return (
-            <div key={category} className="space-y-4">
-              <h2 className="text-xl font-bold text-gray-900">{category}</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {categoryMembers.map((member) => (
-                  <div key={member.id} className="bg-white rounded-xl border-2 border-gray-200 hover:border-indigo-300 p-5">
-                    <div className="flex items-start gap-4 mb-4">
-                      {member.photoUrl ? <img src={member.photoUrl} alt="" className="w-16 h-16 rounded-full object-cover" /> : <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xl flex items-center justify-center font-bold">{member.initials}</div>}
-                      <div className="flex-1 min-w-0">
-                        <button type="button" onClick={() => { setSelectedMember(member); setPageMode('view'); }} className="font-bold text-lg hover:text-indigo-600 text-left">{member.name}</button>
-                        <p className="text-sm text-indigo-600">{member.role}</p>
-                        <span className={`inline-block mt-1 px-2 py-1 rounded-full text-xs border ${getAvailabilityColor(member.availability)}`}>{member.availability}</span>
-                      </div>
-                    </div>
-                    <div className="space-y-1 mb-4 text-sm">
-                      <div className="flex items-center gap-2 text-gray-600"><Mail className="w-4 h-4" />{member.email}</div>
-                      {member.phone && <div className="flex items-center gap-2 text-gray-600"><Phone className="w-4 h-4" />{member.phone}</div>}
-                    </div>
-                    <div className="mb-4">
-                      <div className="flex justify-between text-sm mb-1"><span>Charge</span><span className={`font-bold px-2 py-0.5 rounded ${getWorkloadColor(member.workload)}`}>{member.workload}%</span></div>
-                      <div className="w-full bg-gray-200 rounded-full h-2"><div className={`h-full rounded-full ${member.workload >= 80 ? 'bg-red-500' : member.workload >= 50 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${member.workload}%` }} /></div>
-                    </div>
-                    <div className="flex gap-2 pt-2 border-t">
-                      <button type="button" onClick={() => { setSelectedMember(member); setPageMode('view'); }} className="flex-1 inline-flex items-center justify-center gap-1 py-2 text-sm border rounded-lg hover:bg-gray-50"><Eye className="w-4 h-4" />Voir</button>
-                      <button type="button" onClick={() => { setSelectedMember(member); setForm({ name: member.name, email: member.email, phone: member.phone ?? '', role: member.role, category: member.category, photoUrl: member.photoUrl ?? '' }); setPageMode('edit'); }} className="p-2 border rounded-lg hover:bg-gray-50"><Pencil className="w-4 h-4" /></button>
-                      <button type="button" onClick={() => removeMember(member.id)} className="p-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                    {member.trophies.length > 0 && (
-                      <div className="pt-3 mt-3 border-t flex items-center gap-2">
-                        <Award className="w-4 h-4 text-yellow-500" />
-                        {member.trophies.map((t, i) => <span key={i} className="text-xs bg-yellow-50 px-2 py-1 rounded">{t}</span>)}
-                      </div>
-                    )}
-                  </div>
-                ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {filteredMembers.map((member) => (
+              <MemberCard
+                key={member.id}
+                member={member}
+                onView={() => {
+                  setSelectedMember(member);
+                  setMemberMode('view');
+                }}
+                onEdit={() => {
+                  setSelectedMember(member);
+                  setMemberForm(memberToForm(member));
+                  setMemberMode('edit');
+                }}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </ViewShell>
+  );
+}
+
+type CategoryAccent = {
+  gradient: string;
+  iconBg: string;
+  iconColor: string;
+  badge: string;
+  chip: string;
+  Icon: typeof Briefcase;
+};
+
+function getCategoryAccent(category: string): CategoryAccent {
+  const map: Record<string, CategoryAccent> = {
+    'Direction & Coordination': {
+      gradient: 'from-indigo-600 via-violet-500 to-purple-500',
+      iconBg: 'bg-indigo-50',
+      iconColor: 'text-indigo-600',
+      badge: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+      chip: 'bg-indigo-50/80 text-indigo-700 border-indigo-100',
+      Icon: Users,
+    },
+    'Hardware & IoT': {
+      gradient: 'from-orange-500 via-amber-500 to-yellow-500',
+      iconBg: 'bg-orange-50',
+      iconColor: 'text-orange-600',
+      badge: 'bg-orange-50 text-orange-700 border-orange-100',
+      chip: 'bg-orange-50/80 text-orange-700 border-orange-100',
+      Icon: Cpu,
+    },
+    'Intelligence Artificielle': {
+      gradient: 'from-fuchsia-600 via-purple-500 to-violet-500',
+      iconBg: 'bg-fuchsia-50',
+      iconColor: 'text-fuchsia-600',
+      badge: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100',
+      chip: 'bg-fuchsia-50/80 text-fuchsia-700 border-fuchsia-100',
+      Icon: Brain,
+    },
+    'Cybersécurité & protection enfant': {
+      gradient: 'from-rose-600 via-red-500 to-orange-500',
+      iconBg: 'bg-rose-50',
+      iconColor: 'text-rose-600',
+      badge: 'bg-rose-50 text-rose-700 border-rose-100',
+      chip: 'bg-rose-50/80 text-rose-700 border-rose-100',
+      Icon: Shield,
+    },
+    'Cloud, Backend & Big Data': {
+      gradient: 'from-sky-600 via-blue-500 to-indigo-500',
+      iconBg: 'bg-sky-50',
+      iconColor: 'text-sky-600',
+      badge: 'bg-sky-50 text-sky-700 border-sky-100',
+      chip: 'bg-sky-50/80 text-sky-700 border-sky-100',
+      Icon: Cloud,
+    },
+  };
+
+  return (
+    map[category] ?? {
+      gradient: 'from-slate-600 via-slate-500 to-slate-400',
+      iconBg: 'bg-slate-100',
+      iconColor: 'text-slate-600',
+      badge: 'bg-slate-100 text-slate-700 border-slate-200',
+      chip: 'bg-slate-50 text-slate-600 border-slate-200',
+      Icon: Briefcase,
+    }
+  );
+}
+
+type EnrichedMember = TeamMemberData & { taskCount: number };
+
+function MemberCard({
+  member,
+  onView,
+  onEdit,
+}: {
+  member: EnrichedMember;
+  onView: () => void;
+  onEdit: () => void;
+}) {
+  const accent = getCategoryAccent(member.category);
+  const CategoryIcon = accent.Icon;
+  const availabilityBadge =
+    member.availability === 'Surchargé'
+      ? 'saas-badge saas-badge-danger'
+      : member.availability === 'En congé'
+        ? 'saas-badge saas-badge-neutral'
+        : 'saas-badge saas-badge-success';
+
+  return (
+    <article
+      className="group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+      onClick={onView}
+    >
+      <div className={`h-1.5 w-full bg-gradient-to-r ${accent.gradient}`} />
+
+      <div className="p-5 sm:p-6 border-b border-slate-100">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            {member.photoUrl ? (
+              <img
+                src={member.photoUrl}
+                alt=""
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover ring-2 ring-white shadow-md shrink-0"
+              />
+            ) : (
+              <div
+                className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br ${accent.gradient} text-white flex items-center justify-center text-lg font-bold shadow-md shrink-0`}
+              >
+                {member.initials}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold text-slate-900 text-base sm:text-lg leading-tight group-hover:text-indigo-700 transition-colors">
+                {member.name}
+              </h3>
+              <p className="text-sm text-slate-600 mt-0.5 line-clamp-2 leading-snug">{member.role}</p>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                <span className={`saas-badge border text-[11px] ${accent.badge}`}>
+                  <CategoryIcon className="w-3 h-3 mr-1" />
+                  {shortCategoryLabel(member.category)}
+                </span>
+                <span className={`saas-badge text-[11px] ${availabilityBadge}`}>{member.availability}</span>
               </div>
             </div>
-          );
-        })}
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            className="w-9 h-9 inline-flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-500 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Modifier"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+        </div>
       </div>
-    </ViewShell>
+
+      <div className="px-5 sm:px-6 py-4 space-y-3">
+        <div className="flex flex-col gap-1.5 text-xs text-slate-500">
+          <span className="inline-flex items-center gap-2 min-w-0">
+            <Mail className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+            <span className="truncate">{member.email}</span>
+          </span>
+          {member.phone ? (
+            <span className="inline-flex items-center gap-2">
+              <Phone className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+              {member.phone}
+            </span>
+          ) : null}
+        </div>
+
+        {member.skills.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {member.skills.slice(0, 3).map((skill) => (
+              <span
+                key={skill}
+                className={`inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-medium border ${accent.chip}`}
+              >
+                {skill}
+              </span>
+            ))}
+            {member.skills.length > 3 ? (
+              <span className="inline-flex items-center px-2 py-1 rounded-lg text-[11px] text-slate-400 bg-slate-50 border border-slate-100">
+                +{member.skills.length - 3}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="px-5 sm:px-6 py-4 bg-slate-50/70 border-t border-slate-100">
+        <div className="flex items-center justify-between text-xs text-slate-500 mb-1.5">
+          <span>Charge vs moyenne équipe</span>
+          <span className={`font-bold px-2 py-0.5 rounded-md text-xs ${workloadColorClass(member.workload)}`}>
+            {member.workload}%
+          </span>
+        </div>
+        <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${workloadBarClass(member.workload)}`}
+            style={{ width: `${Math.min(Math.max(member.workload, 4), 100)}%` }}
+          />
+        </div>
+        <p className="text-[11px] text-slate-400 mt-1.5">{member.taskCount} tâche(s) ouverte(s)</p>
+      </div>
+
+      <div className="px-5 sm:px-6 py-3 bg-white border-t border-slate-100 flex items-center justify-between">
+        <span className="text-xs text-slate-500 inline-flex items-center gap-1">
+          {member.trophies?.length ? (
+            <>
+              <Award className="w-3.5 h-3.5 text-amber-500" />
+              {member.trophies.length} distinction(s)
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              Profil actif
+            </>
+          )}
+        </span>
+        <span className="text-xs font-medium text-indigo-600 inline-flex items-center gap-1 group-hover:gap-2 transition-all">
+          <Eye className="w-3.5 h-3.5" />
+          Voir le profil
+        </span>
+      </div>
+    </article>
+  );
+}
+
+function shortCategoryLabel(category: string): string {
+  const part = category.split('&')[0]?.trim() ?? category;
+  return part.length > 22 ? `${part.slice(0, 20)}…` : part;
+}
+
+function PositionCard({
+  position,
+  assignedMembers,
+  onEdit,
+  onDelete,
+}: {
+  position: TeamPosition;
+  assignedMembers: TeamMemberData[];
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const accent = getCategoryAccent(position.category);
+  const CategoryIcon = accent.Icon;
+  const visibleSkills = position.competencies.slice(0, 5);
+  const extraSkills = position.competencies.length - visibleSkills.length;
+  const memberCount = assignedMembers.length;
+
+  return (
+    <article className="group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
+      <div className={`h-1.5 w-full bg-gradient-to-r ${accent.gradient}`} />
+
+      <div className="p-5 sm:p-6 border-b border-slate-100">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <div
+              className={`w-12 h-12 rounded-2xl ${accent.iconBg} ${accent.iconColor} inline-flex items-center justify-center shrink-0 shadow-sm`}
+            >
+              <CategoryIcon className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-semibold text-slate-900 text-base leading-snug">{position.title}</h3>
+              <span className={`inline-flex mt-2 saas-badge border text-[11px] ${accent.badge}`}>
+                {position.category}
+              </span>
+            </div>
+          </div>
+          <div className="flex gap-1 shrink-0 opacity-80 group-hover:opacity-100">
+            <button
+              type="button"
+              onClick={onEdit}
+              className="w-9 h-9 inline-flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-500"
+              title="Modifier"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              className="w-9 h-9 inline-flex items-center justify-center rounded-xl hover:bg-red-50 text-red-600"
+              title="Supprimer"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-5 sm:px-6 py-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex -space-x-2">
+            {assignedMembers.slice(0, 4).map((m) => (
+              <div
+                key={m.id}
+                title={m.name}
+                className={`w-7 h-7 rounded-full border-2 border-white bg-gradient-to-br ${accent.gradient} flex items-center justify-center text-[10px] font-bold text-white`}
+              >
+                {m.initials.slice(0, 2)}
+              </div>
+            ))}
+            {memberCount > 4 ? (
+              <div className="w-7 h-7 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-[10px] font-semibold text-slate-600">
+                +{memberCount - 4}
+              </div>
+            ) : null}
+          </div>
+          <span className="text-xs text-slate-500">
+            {memberCount === 0
+              ? 'Aucun membre assigné'
+              : `${memberCount} membre${memberCount > 1 ? 's' : ''}`}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {visibleSkills.map((skill) => (
+            <span
+              key={skill}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border ${accent.chip}`}
+            >
+              <Sparkles className="w-3 h-3 opacity-60" />
+              {skill}
+            </span>
+          ))}
+          {extraSkills > 0 ? (
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] text-slate-500 bg-slate-50 border border-slate-200">
+              +{extraSkills} compétence{extraSkills > 1 ? 's' : ''}
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="px-5 sm:px-6 py-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs">
+        <span className="text-slate-500 inline-flex items-center gap-1.5">
+          <Briefcase className="w-3.5 h-3.5" />
+          {position.competencies.length} compétence{position.competencies.length > 1 ? 's' : ''}
+        </span>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="font-medium text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+          Modifier
+        </button>
+      </div>
+    </article>
   );
 }

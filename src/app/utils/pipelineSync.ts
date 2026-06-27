@@ -1,5 +1,6 @@
 import { INITIAL_PIPELINE } from '../data/initialPipeline';
 import { TEST_TASKS, calculateTaskProgress, type TestTask } from '../data/testData';
+import { MEETING_DEMO_TASKS } from '../data/meetingDemoData';
 import { DEMO_PIPELINE_BY_PROJECT, DEMO_RISKS_BY_PROJECT, DEMO_TASKS_BY_PROJECT } from '../data/multiProjectDemoFixtures';
 import { mergeDemoData } from './demoDataMerge';
 import type { PipelineStage } from '../types/planning';
@@ -43,7 +44,7 @@ export function loadAllTasks(): TestTask[] {
   try {
     const raw = localStorage.getItem(TASKS_STORAGE_KEY);
     const saved = raw ? (JSON.parse(raw) as TestTask[]) : [];
-    return mergeDemoData(saved, DEMO_TASKS_BY_PROJECT, TEST_TASKS);
+    return mergeDemoData(saved, DEMO_TASKS_BY_PROJECT, MEETING_DEMO_TASKS, TEST_TASKS);
   } catch {
     return [...TEST_TASKS];
   }

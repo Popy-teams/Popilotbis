@@ -1,6 +1,6 @@
 import { Archive, Edit2, Trash2 } from 'lucide-react';
 import { Project } from '../../../types';
-import { getStatusColor, getStatusLabel, withEffectiveStatus } from './projectPresentation';
+import { getStatusColor, getStatusLabel, withEffectiveStatus, getBudgetUsagePercent } from './projectPresentation';
 
 interface ProjectsTableProps {
   projects: Project[];
@@ -62,7 +62,7 @@ export function ProjectsTable({ projects, onOpen, onEdit, onArchive, onDelete }:
                   <td className="px-4 py-3"><span className={`saas-badge ${getStatusColor(project.status)}`}>{getStatusLabel(project.status)}</span></td>
                   <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="h-2 w-24 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-blue-600 rounded-full" style={{ width: `${Math.max(0, Math.min(100, project.progress))}%` }} /></div><span className="text-xs font-semibold text-slate-700">{project.progress}%</span></div></td>
                   <td className="px-4 py-3 text-sm text-slate-700">{new Date(project.deadline).toLocaleDateString('fr-FR')}</td>
-                  <td className="px-4 py-3 text-sm text-slate-700">{((project.budget.used / project.budget.total) * 100).toFixed(0)}% utilise</td>
+                  <td className="px-4 py-3 text-sm text-slate-700">{getBudgetUsagePercent(project)}% utilise</td>
                   <td className="px-4 py-3 text-sm text-slate-700">{project.team?.slice(0, 3).join(', ') || '-'}</td>
                   <td className="px-4 py-3"><div className="flex items-center justify-end gap-1"><button className="w-8 h-8 inline-flex items-center justify-center hover:bg-slate-100 rounded-lg" onClick={(e) => { e.stopPropagation(); onEdit(project); }}><Edit2 className="w-4 h-4 text-slate-500" /></button><button className="w-8 h-8 inline-flex items-center justify-center hover:bg-slate-100 rounded-lg" onClick={(e) => { e.stopPropagation(); onArchive(project); }}><Archive className="w-4 h-4 text-slate-500" /></button><button className="w-8 h-8 inline-flex items-center justify-center hover:bg-red-50 rounded-lg" onClick={(e) => { e.stopPropagation(); onDelete(project); }}><Trash2 className="w-4 h-4 text-red-600" /></button></div></td>
                 </tr>

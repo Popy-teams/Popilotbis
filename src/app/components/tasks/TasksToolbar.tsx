@@ -1,5 +1,12 @@
-import { Plus } from 'lucide-react';
-import { FormSelect, SearchField } from '../shared';
+import {
+  Plus,
+  CheckSquare,
+  PlayCircle,
+  CheckCircle2,
+  AlertTriangle,
+  TrendingUp,
+} from 'lucide-react';
+import { FormSelect, SearchField, ViewHero, ViewStatCard, ViewStatsGrid, ViewFilterPanel, ViewTabPills, ViewTabBtn } from '../shared';
 
 interface TasksToolbarProps {
   projectName: string;
@@ -40,62 +47,61 @@ export function TasksToolbar({
 }: TasksToolbarProps) {
   return (
     <>
-      <section className="rounded-2xl border border-slate-200 bg-gradient-to-br from-indigo-50/80 via-white to-slate-50 p-4 sm:p-6 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              Tâches
-            </h1>
-            <p className="text-slate-600 mt-1 text-sm sm:text-base">{projectName}</p>
-          </div>
+      <ViewHero
+        title="Tâches"
+        subtitle="Suivi Kanban, priorités et synchronisation automatique avec le pipeline du projet."
+        badge={`${projectName} · Exécution`}
+        badgeIcon={CheckSquare}
+        theme="indigo"
+        actions={
           <button
             type="button"
             onClick={onCreate}
-            className="w-full sm:w-auto justify-center flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-500/20 transition-colors"
+            className="inline-flex items-center gap-2 bg-white text-indigo-900 px-4 py-2.5 rounded-xl hover:bg-indigo-50 font-semibold shadow-md transition-colors"
           >
             <Plus className="w-5 h-5 shrink-0" />
             Nouvelle tâche
           </button>
-        </div>
+        }
+        stats={
+          <ViewStatsGrid cols={5}>
+            <ViewStatCard label="Total" value={String(stats.total)} gradient="from-slate-500 to-slate-700" icon={CheckSquare} onDark />
+            <ViewStatCard label="En cours" value={String(stats.inProgress)} gradient="from-blue-500 to-cyan-500" icon={PlayCircle} onDark />
+            <ViewStatCard label="Terminées" value={String(stats.done)} gradient="from-emerald-500 to-teal-500" icon={CheckCircle2} onDark />
+            <ViewStatCard label="En retard" value={String(stats.overdue)} gradient="from-red-500 to-rose-500" icon={AlertTriangle} onDark />
+            <ViewStatCard label="Avancement moy." value={`${stats.avgProgress}%`} gradient="from-violet-500 to-purple-500" icon={TrendingUp} onDark />
+          </ViewStatsGrid>
+        }
+      />
 
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <StatCard label="Total" value={String(stats.total)} />
-          <StatCard label="En cours" value={String(stats.inProgress)} accent="text-blue-600" />
-          <StatCard label="Terminées" value={String(stats.done)} accent="text-emerald-600" />
-          <StatCard label="En retard" value={String(stats.overdue)} accent="text-red-600" />
-          <StatCard label="Avancement moy." value={`${stats.avgProgress}%`} className="col-span-2 sm:col-span-1" />
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm space-y-3">
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+      <ViewFilterPanel className="space-y-3">
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Recherche</label>
           <SearchField
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             placeholder="Rechercher une tâche…"
-            className="border-0 bg-transparent shadow-none focus:shadow-none min-h-10"
           />
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {STATUS_PILLS.map((pill) => (
-            <button
-              key={pill.id}
-              type="button"
-              onClick={() => onStatusFilterChange(pill.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                statusFilter === pill.id
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {pill.label}
-            </button>
-          ))}
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Statut</label>
+          <ViewTabPills>
+            {STATUS_PILLS.map((pill) => (
+              <ViewTabBtn
+                key={pill.id}
+                active={statusFilter === pill.id}
+                onClick={() => onStatusFilterChange(pill.id)}
+              >
+                {pill.label}
+              </ViewTabBtn>
+            ))}
+          </ViewTabPills>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-1 border-t border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3 pt-1 border-t border-slate-100">
           <div className="w-full sm:w-48">
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Priorité</label>
             <FormSelect
               value={priorityFilter}
               onChange={(e) => onPriorityFilterChange(e.target.value)}
@@ -108,26 +114,7 @@ export function TasksToolbar({
             </FormSelect>
           </div>
         </div>
-      </section>
+      </ViewFilterPanel>
     </>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  accent,
-  className = '',
-}: {
-  label: string;
-  value: string;
-  accent?: string;
-  className?: string;
-}) {
-  return (
-    <div className={`rounded-xl border border-slate-200 bg-white px-3 py-2.5 sm:px-4 sm:py-3 ${className}`}>
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className={`text-lg sm:text-xl font-semibold ${accent ?? 'text-slate-900'}`}>{value}</p>
-    </div>
   );
 }

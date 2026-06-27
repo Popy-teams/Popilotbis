@@ -16,7 +16,7 @@ import { useProjectContext } from '../context/ProjectContext';
 import { usePipeline } from '../context/PipelineContext';
 import { evaluateStage } from '../utils/pipelineSync';
 import { PageBackHeader } from './shared/PageBackHeader';
-import { ViewShell, ViewHeader, ActionButton } from './shared';
+import { ViewShell, ViewHeader, ActionButton, ViewHighlightBanner, ViewStatCard, ViewStatsGrid } from './shared';
 import { TaskStatusBadge } from './shared/displayHelpers';
 import { PipelineStageFormPage } from './pipeline/PipelineStageFormPage';
 import { useNavigate } from 'react-router';
@@ -540,31 +540,50 @@ export function PipelineView() {
       <ViewHeader
         title={activeProject ? `Pipeline — ${activeProject.name}` : 'Pipeline du projet'}
         subtitle="Étapes synchronisées avec les tâches, documents et risques du projet"
+        badge="Pipeline · Jalons"
+        theme="violet"
         actions={
           <ActionButton icon={Plus} onClick={openCreate}>
             Nouvelle étape
           </ActionButton>
         }
+        stats={
+          <ViewStatsGrid cols={4}>
+            <ViewStatCard
+              label="Étapes"
+              value={String(scopedStages.length)}
+              gradient="from-violet-500 to-purple-500"
+              onDark
+            />
+            <ViewStatCard
+              label="Complétées"
+              value={String(scopedStages.filter((s) => s.status === 'completed').length)}
+              gradient="from-emerald-500 to-teal-500"
+              onDark
+            />
+            <ViewStatCard
+              label="En cours"
+              value={String(scopedStages.filter((s) => s.status === 'in-progress').length)}
+              gradient="from-blue-500 to-cyan-500"
+              onDark
+            />
+            <ViewStatCard
+              label="Avancement global"
+              value={`${overallProgress}%`}
+              gradient="from-amber-500 to-orange-500"
+              onDark
+            />
+          </ViewStatsGrid>
+        }
       />
 
-      <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 rounded-xl">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-2xl font-bold">Avancement global du projet</h2>
-            <p className="text-purple-100 mt-1">
-              {scopedStages.filter((s) => s.status === 'completed').length} / {scopedStages.length} étapes
-              complétées
-            </p>
-          </div>
-          <div className="text-5xl font-bold">{overallProgress}%</div>
-        </div>
-        <div className="w-full bg-white/20 rounded-full h-4">
-          <div
-            className="bg-white h-4 rounded-full transition-all"
-            style={{ width: `${overallProgress}%` }}
-          />
-        </div>
-      </div>
+      <ViewHighlightBanner
+        title="Avancement global du projet"
+        subtitle={`${scopedStages.filter((s) => s.status === 'completed').length} / ${scopedStages.length} étapes complétées`}
+        value={`${overallProgress}%`}
+        progress={overallProgress}
+        theme="violet"
+      />
 
       <div className="bg-white rounded-xl border border-gray-200 p-6 md:p-8">
         <h2 className="text-xl font-bold text-gray-900 mb-6">Flux du projet</h2>
