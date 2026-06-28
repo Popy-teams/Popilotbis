@@ -3,6 +3,7 @@ import { Target } from 'lucide-react';
 import {
   rehydrateAuditBlocks,
   serializeAuditBlocks,
+  mergeAuditBlocks,
   AUDIT_BLOCK_ICONS,
   type AuditBlockData,
 } from './auditHelpers';
@@ -41,5 +42,13 @@ describe('auditHelpers', () => {
     const serialized = serializeAuditBlocks([block]);
     expect(serialized[0]).not.toHaveProperty('icon');
     expect(serialized[0].title).toBe('Contexte');
+  });
+
+  it('mergeAuditBlocks fusionne par projet et bloc sans écraser', () => {
+    const popy = { ...storedBlock, projectId: 'popy', title: 'POPY contexte' };
+    const other = { ...storedBlock, projectId: 'firmware-v2', title: 'Firmware contexte' };
+    const merged = mergeAuditBlocks([popy], [other]);
+    expect(merged).toHaveLength(2);
+    expect(merged.map((b) => b.projectId).sort()).toEqual(['firmware-v2', 'popy']);
   });
 });

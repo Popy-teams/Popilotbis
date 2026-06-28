@@ -142,3 +142,26 @@ export function serializeAuditBlocks(blocks: AuditBlockData[]): StoredAuditBlock
 }
 
 export const AUDIT_STORAGE_KEY = 'popilot:audit-local-v2';
+export const AUDIT_FIXTURE_VERSION_KEY = 'popilot:audit-fixture-version';
+export const AUDIT_FIXTURE_VERSION = 'audit-v3';
+
+/** Fusion par couple projet + bloc (évite d'écraser popy quand un autre projet a le même id de bloc). */
+export function mergeAuditBlocks(
+  saved: StoredAuditBlock[],
+  ...pools: StoredAuditBlock[][]
+): StoredAuditBlock[] {
+  const key = (b: StoredAuditBlock) => `${b.projectId ?? 'popy'}:${b.id}`;
+  const map = new Map<string, StoredAuditBlock>();
+  for (const b of saved) map.set(key(b), b);
+  for (const pool of pools) {
+    for (const b of pool) {
+      const k = key(b);
+      if (!map.has(k)) map.set(k, b);
+    }
+  }
+  return [...map.values()];
+}
+
+export function buildAuditFixtureSeed(...pools: StoredAuditBlock[][]): StoredAuditBlock[] {
+  return mergeAuditBlocks([], ...pools);
+}
