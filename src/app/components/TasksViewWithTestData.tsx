@@ -118,6 +118,16 @@ export function TasksViewWithTestData() {
     setPageMode('list');
   };
 
+  const updateTaskStatus = (taskId: string, status: TestTask['status']) => {
+    const next = tasks.map((t) => {
+      if (t.id !== taskId) return t;
+      const progress =
+        status === 'done' ? 100 : status === 'todo' ? Math.min(t.progress, 10) : t.progress;
+      return { ...t, status, progress };
+    });
+    persistTasks(next);
+  };
+
   if (pageMode === 'create') {
     return (
       <TaskFormPage
@@ -196,6 +206,7 @@ export function TasksViewWithTestData() {
       onOpen={openView}
       onEdit={openEdit}
       onDelete={(task) => removeTask(task.id)}
+      onStatusChange={updateTaskStatus}
     />
   );
 }

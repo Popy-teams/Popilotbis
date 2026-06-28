@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router';
+import { ChevronRight, X } from 'lucide-react';
 import type { AuthUser } from '../auth/authApi';
 import { APP_ROUTES, type NavSection } from '../routes/viewRoutes';
-import { X } from 'lucide-react';
 import { AppIcon } from './shared/icons';
 import { cn } from './ui/utils';
 
@@ -12,82 +12,128 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
-export function Sidebar({ user, onNavigate, open = false, onClose }: SidebarProps) {
-  const renderNavSection = (section: NavSection, title: string) => (
-    <div className={section === 'personal' ? 'mb-4' : undefined}>
-      <div className="text-xs uppercase text-indigo-300 font-semibold mb-2 px-4">{title}</div>
-      {APP_ROUTES.filter((item) => item.section === section).map((item) => (
-        <NavLink
-          key={item.id}
-          to={`/${item.path}`}
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            cn(
-              'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left',
-              isActive
-                ? 'bg-indigo-600 text-white font-medium shadow-md'
-                : 'text-indigo-100 hover:bg-indigo-800/40'
-            )
-          }
-        >
-          {({ isActive }) => (
-            <>
-              <AppIcon icon={item.icon} size="md" className={isActive ? 'text-white' : 'text-indigo-200'} />
-              <span className="truncate">{item.label}</span>
-            </>
-          )}
-        </NavLink>
-      ))}
-    </div>
-  );
+const SECTIONS: { key: NavSection; title: string }[] = [
+  { key: 'personal', title: 'Mon espace' },
+  { key: 'management', title: 'Management' },
+  { key: 'quality', title: 'Qualité' },
+];
 
+const SECTION_ICON_CLASS: Record<NavSection, string> = {
+  personal: 'text-sky-600',
+  management: 'text-indigo-600',
+  quality: 'text-violet-600',
+};
+
+function UserInitials({ name }: { name: string }) {
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+export function Sidebar({ user, onNavigate, open = false, onClose }: SidebarProps) {
   return (
     <aside
-      className={cn(
-        'fixed inset-y-0 left-0 z-50 w-64 max-w-[85vw] bg-gradient-to-b from-slate-900 to-indigo-950 text-white flex flex-col border-r border-indigo-900/40',
-        'transform transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 lg:max-w-none lg:shrink-0',
-        open ? 'translate-x-0' : '-translate-x-full'
-      )}
+      className={cn('app-sidebar app-sidebar--mobile', open && 'app-sidebar--open')}
       aria-label="Navigation principale"
     >
-      <div className="p-6 border-b border-indigo-800/50 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold">POPILOT</h1>
-          <p className="text-indigo-200/90 text-sm mt-1">ISO 9001 Certified</p>
-        </div>
-        {onClose ? (
-          <button
-            type="button"
-            onClick={onClose}
-            className="lg:hidden p-2 rounded-lg hover:bg-indigo-800/40 shrink-0"
-            aria-label="Fermer le menu"
-          >
-            <AppIcon icon={X} size="md" />
-          </button>
-        ) : null}
+      <div className="app-sidebar__backdrop" aria-hidden>
+        <div className="app-sidebar__orb app-sidebar__orb--1" />
+        <div className="app-sidebar__orb app-sidebar__orb--2" />
+        <div className="app-sidebar__orb app-sidebar__orb--3" />
       </div>
+      <div className="app-sidebar__sheen" aria-hidden />
+      <div className="app-sidebar__noise" aria-hidden />
 
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {renderNavSection('personal', 'Mon espace')}
-        {renderNavSection('management', 'Management')}
-        {renderNavSection('quality', 'Qualité')}
-      </nav>
+      <div className="app-sidebar__inner">
+        <header className="app-sidebar__brand">
+          <div className="app-sidebar__logo-row">
+            <div className="app-sidebar__logo-mark">
+              <div className="app-sidebar__logo-icon" aria-hidden>
+                <span>PO</span>
+              </div>
+              <div className="min-w-0">
+                <h1 className="app-sidebar__title">POPILOT</h1>
+                <div className="app-sidebar__badge">
+                  <span className="app-sidebar__badge-dot" aria-hidden />
+                  ISO 9001 Certified
+                </div>
+              </div>
+            </div>
+            {onClose ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="app-sidebar__close lg:hidden"
+                aria-label="Fermer le menu"
+              >
+                <AppIcon icon={X} size="sm" />
+              </button>
+            ) : null}
+          </div>
+        </header>
 
-      <div className="p-4 border-t border-indigo-700/50">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center font-semibold shrink-0">
-            {user.name
-              .split(' ')
-              .map((n) => n[0])
-              .join('')
-              .slice(0, 2)
-              .toUpperCase()}
+        <nav className="app-sidebar__nav">
+          {SECTIONS.map(({ key, title }) => {
+            const items = APP_ROUTES.filter((item) => item.section === key);
+            if (items.length === 0) return null;
+
+            return (
+              <div key={key} className="app-sidebar__section">
+                <div className="app-sidebar__section-label">{title}</div>
+                <div className="app-sidebar__links">
+                  {items.map((item) => (
+                    <NavLink
+                      key={item.id}
+                      to={`/${item.path}`}
+                      onClick={onNavigate}
+                      data-section={key}
+                      className={({ isActive }) =>
+                        cn('app-sidebar__link', isActive && 'app-sidebar__link--active')
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <span className="app-sidebar__reflet" aria-hidden />
+                          <span className="app-sidebar__link-indicator" aria-hidden />
+                          <span className="app-sidebar__icon-wrap">
+                            <AppIcon
+                              icon={item.icon}
+                              size="sm"
+                              className={
+                                isActive ? SECTION_ICON_CLASS[key] : 'text-slate-500'
+                              }
+                            />
+                          </span>
+                          <span className="app-sidebar__label">{item.label}</span>
+                          {isActive ? (
+                            <ChevronRight className="app-sidebar__chevron" aria-hidden />
+                          ) : null}
+                        </>
+                      )}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </nav>
+
+        <footer className="app-sidebar__footer">
+          <div className="app-sidebar__user">
+            <div className="app-sidebar__avatar">
+              <span className="app-sidebar__avatar-inner">
+                <UserInitials name={user.name} />
+              </span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="app-sidebar__user-name">{user.name}</div>
+              <div className="app-sidebar__user-role">{user.role}</div>
+            </div>
           </div>
-          <div className="min-w-0">
-            <div className="font-medium truncate">{user.name}</div>
-            <div className="text-xs text-indigo-200 truncate capitalize">{user.role}</div>
-          </div>
-        </div>
+        </footer>
       </div>
     </aside>
   );

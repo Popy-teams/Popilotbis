@@ -1,29 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
   Target,
   MessageSquareQuote,
   Award,
   Medal,
-  Zap,
-  PartyPopper,
-  Bot,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useProjectContext } from '../../context/ProjectContext';
-import { TEST_TEAM_MEMBERS, TEST_TASKS } from '../../data/testData';
-import {
-  ViewShell,
-  ViewHero,
-  ViewStatCard,
-  ViewStatsGrid,
-  ViewTabPills,
-  ViewTabBtn,
-  ViewSectionTitle,
-} from '../../components/shared';
+import { TEST_TASKS } from '../../data/testData';
+import type { TeamMemberData } from '../../data/testTeamData';
+import { ViewShell } from '../../components/shared';
 import { loadMeetings } from '../../utils/meetingSync';
 import { TASKS_STORAGE_KEY } from '../../utils/pipelineSync';
 import type { TestTask } from '../../data/testData';
+import {
+  findTeamMember,
+  getScopedTeamMembers,
+  loadTeamMembers,
+  scopeQuotesToRoster,
+  scopeResponsesToRoster,
+} from '../../utils/teamMemberStore';
 import { generateTaquinMessages } from '../../utils/teamSpaceBot';
 import { computeWeeklyAwards } from '../../utils/teamSpaceAwards';
 import { getWeeklyChallenge } from '../../utils/teamSpaceChallenge';
@@ -39,14 +37,27 @@ import {
   awardPointsForVoteReceived,
   awardPointsForWeeklyAward,
 } from '../../utils/teamSpaceStore';
+import { loadMemberPhotos, saveMemberPhoto } from '../../utils/teamSpacePhotos';
 import { getWeekKey } from '../../utils/teamSpaceTime';
+import { TeamSpacePhotoProvider } from './TeamSpacePhotoContext';
+import { TeamSpaceHeader } from './components/TeamSpaceHeader';
+import { PodiumTop3 } from './components/PodiumTop3';
 import { TaquinCarousel } from './components/TaquinBotPanel';
 import { WeeklyChallengePanel } from './components/WeeklyChallengePanel';
 import { QuotesWallPanel } from './components/QuotesWallPanel';
 import { WeeklyAwardsPanel } from './components/WeeklyAwardsPanel';
 import { LeaderboardPanel } from './components/LeaderboardPanel';
+import { PhotoWall } from './components/PhotoWall';
 
 type SectionId = 'overview' | 'challenge' | 'quotes' | 'awards' | 'ranking';
+
+const TABS: { id: SectionId; label: string; icon: LucideIcon }[] = [
+  { id: 'overview', label: "Vue d'ensemble", icon: LayoutDashboard },
+  { id: 'challenge', label: 'Défi', icon: Target },
+  { id: 'quotes', label: 'Citations', icon: MessageSquareQuote },
+  { id: 'awards', label: 'Prix', icon: Award },
+  { id: 'ranking', label: 'Classement', icon: Medal },
+];
 
 function loadTasks(): TestTask[] {
   try {
@@ -57,19 +68,33 @@ function loadTasks(): TestTask[] {
   }
 }
 
-function resolveCurrentMember(userName: string, userEmail: string) {
-  const byName = TEST_TEAM_MEMBERS.find(
-    (m) => m.name.toLowerCase() === userName.toLowerCase() || m.email === userEmail
+function resolveCurrentMember(
+  userName: string,
+  userEmail: string,
+  roster: TeamMemberData[]
+): TeamMemberData | undefined {
+  return (
+    findTeamMember(userEmail, roster) ??
+    findTeamMember(userName, roster) ??
+    roster[0]
   );
-  return byName ?? TEST_TEAM_MEMBERS[0];
 }
 
 export function TeamSpaceView() {
   const { user } = useAuth();
-  const { activeProject } = useProjectContext();
-  const member = resolveCurrentMember(user?.name ?? 'Alice Martin', user?.email ?? '');
+  const { activeProject, matchesProject } = useProjectContext();
+  const [teamMembers, setTeamMembers] = useState(loadTeamMembers);
+  const scopedMembers = useMemo(
+    () => getScopedTeamMembers(matchesProject),
+    [teamMembers, matchesProject]
+  );
+  const member = useMemo(
+    () => resolveCurrentMember(user?.name ?? '', user?.email ?? '', scopedMembers),
+    [user, scopedMembers]
+  );
 
   const [section, setSection] = useState<SectionId>('overview');
+  const [memberPhotos, setMemberPhotos] = useState(loadMemberPhotos);
   const [tasks, setTasks] = useState<TestTask[]>(loadTasks);
   const [meetings, setMeetings] = useState(() => loadMeetings());
   const [quotes, setQuotes] = useState(() => loadQuotes());
@@ -83,21 +108,50 @@ export function TeamSpaceView() {
     setQuotes(loadQuotes());
     setResponses(loadChallengeResponses());
     setPointsMap(loadAllPoints());
+    setMemberPhotos(loadMemberPhotos());
   }, []);
 
   useEffect(() => {
     refresh();
     const handler = () => refresh();
+    const onTeamUpdated = () => setTeamMembers(loadTeamMembers());
     window.addEventListener('popilot:team-space-updated', handler);
     window.addEventListener('popilot:pipeline-updated', handler);
+    window.addEventListener('popilot:team-updated', onTeamUpdated);
     return () => {
       window.removeEventListener('popilot:team-space-updated', handler);
       window.removeEventListener('popilot:pipeline-updated', handler);
+      window.removeEventListener('popilot:team-updated', onTeamUpdated);
     };
   }, [refresh]);
 
+  const combinedPhotos = useMemo(() => {
+    const base = { ...memberPhotos };
+    for (const m of scopedMembers) {
+      if (m.photoUrl) base[m.id] = m.photoUrl;
+    }
+    return base;
+  }, [memberPhotos, scopedMembers]);
+
+  const scopedQuotes = useMemo(
+    () => scopeQuotesToRoster(quotes, scopedMembers),
+    [quotes, scopedMembers]
+  );
+  const scopedResponses = useMemo(
+    () => scopeResponsesToRoster(responses, scopedMembers),
+    [responses, scopedMembers]
+  );
+
+  const setMemberPhoto = useCallback((memberId: string, dataUrl: string) => {
+    saveMemberPhoto(memberId, dataUrl);
+    setMemberPhotos(loadMemberPhotos());
+  }, []);
+
   const taquinMessages = useMemo(() => generateTaquinMessages(tasks, meetings), [tasks, meetings]);
-  const weeklyAwards = useMemo(() => computeWeeklyAwards(tasks, meetings), [tasks, meetings]);
+  const weeklyAwards = useMemo(
+    () => computeWeeklyAwards(tasks, meetings, new Date(), scopedMembers),
+    [tasks, meetings, scopedMembers]
+  );
   const challenge = useMemo(() => getWeeklyChallenge(), []);
   const weekKey = getWeekKey();
 
@@ -113,26 +167,23 @@ export function TeamSpaceView() {
   }, [weekKey, weeklyAwards, refresh]);
 
   const leaderboard = useMemo(() => {
-    const ids = new Set([...TEST_TEAM_MEMBERS.map((m) => m.id), ...Object.keys(pointsMap)]);
-    return [...ids].map((id) => {
-      const m = TEST_TEAM_MEMBERS.find((x) => x.id === id);
-      return getMemberPoints(id, m?.name ?? pointsMap[id]?.memberName ?? id);
-    });
-  }, [pointsMap, awardsGranted]);
+    return scopedMembers.map((m) => getMemberPoints(m.id, m.name));
+  }, [scopedMembers, pointsMap, awardsGranted]);
 
-  const myPoints = getMemberPoints(member.id, member.name);
+  const myPoints = member ? getMemberPoints(member.id, member.name) : { monthly: 0, total: 0, memberId: '', memberName: '', monthKey: '', history: [] };
   const sortedLeaderboard = [...leaderboard].sort((a, b) => b.monthly - a.monthly || b.total - a.total);
-  const myRank = sortedLeaderboard.findIndex((e) => e.memberId === member.id) + 1;
-  const weekResponses = responses.filter((r) => r.weekKey === weekKey);
+  const myRank = member ? sortedLeaderboard.findIndex((e) => e.memberId === member.id) + 1 : 0;
+  const weekResponses = scopedResponses.filter((r) => r.weekKey === weekKey);
 
-  const handlePublishQuote = (text: string, context?: string) => {
-    if (!text) return;
+  const handlePublishQuote = (text: string, context?: string, imageUrl?: string) => {
+    if (!text || !member) return;
     const q = {
       id: `quote-${Date.now()}`,
       text,
       authorId: member.id,
       authorName: member.name,
       context,
+      imageUrl,
       createdAt: new Date().toISOString(),
       votes: [member.id],
     };
@@ -144,6 +195,7 @@ export function TeamSpaceView() {
   };
 
   const handleVoteQuote = (quoteId: string) => {
+    if (!member) return;
     const next = quotes.map((q) => {
       if (q.id !== quoteId) return q;
       const voted = q.votes.includes(member.id);
@@ -156,7 +208,8 @@ export function TeamSpaceView() {
     refresh();
   };
 
-  const handleChallengeSubmit = (content: string) => {
+  const handleChallengeSubmit = (content: string, imageUrl?: string) => {
+    if (!member) return;
     const r = {
       id: `cr-${Date.now()}`,
       challengeId: challenge.id,
@@ -164,6 +217,7 @@ export function TeamSpaceView() {
       authorId: member.id,
       authorName: member.name,
       content,
+      imageUrl,
       createdAt: new Date().toISOString(),
       likes: [],
     };
@@ -175,6 +229,7 @@ export function TeamSpaceView() {
   };
 
   const handleChallengeLike = (responseId: string) => {
+    if (!member) return;
     const next = responses.map((r) => {
       if (r.id !== responseId) return r;
       const liked = r.likes.includes(member.id);
@@ -184,81 +239,64 @@ export function TeamSpaceView() {
     setResponses(next);
   };
 
+  if (!member) {
+    return (
+      <ViewShell className="team-space-shell">
+        <p className="text-slate-600 text-sm">
+          Aucun membre d&apos;équipe pour ce projet. Ajoutez des membres dans l&apos;onglet Équipe.
+        </p>
+      </ViewShell>
+    );
+  }
+
   return (
-    <ViewShell>
-      <ViewHero
-        title="Espace Équipe"
-        subtitle="Cohésion, humour et reconnaissance — bot taquin, défi hebdomadaire, mur de citations et classement."
-        badge={`${activeProject?.name ?? 'Projet'} · Semaine ${weekKey}`}
-        badgeIcon={PartyPopper}
-        theme="amber"
-        stats={
-          <ViewStatsGrid cols={4}>
-            <ViewStatCard
-              label="Vos points"
-              value={String(myPoints.monthly)}
-              gradient="from-amber-500 to-orange-500"
-              icon={Zap}
-              onDark
-            />
-            <ViewStatCard
-              label="Classement"
-              value={myRank > 0 ? `#${myRank}` : '—'}
-              gradient="from-violet-500 to-purple-500"
-              icon={Medal}
-              onDark
-            />
-            <ViewStatCard
-              label="Réponses défi"
-              value={String(weekResponses.length)}
-              gradient="from-cyan-500 to-blue-500"
-              icon={Target}
-              onDark
-            />
-            <ViewStatCard
-              label="Citations"
-              value={String(quotes.length)}
-              gradient="from-rose-500 to-pink-500"
-              icon={MessageSquareQuote}
-              onDark
-            />
-          </ViewStatsGrid>
-        }
-      />
+    <TeamSpacePhotoProvider photos={combinedPhotos} setMemberPhoto={setMemberPhoto}>
+      <ViewShell className="team-space-shell">
+        <TeamSpaceHeader
+          memberId={member.id}
+          memberName={member.name}
+          projectName={activeProject?.name ?? 'Projet'}
+          weekKey={weekKey}
+          myPoints={myPoints.monthly}
+          myRank={myRank}
+          challengeCount={weekResponses.length}
+          quoteCount={scopedQuotes.length}
+          onPhotoUpdated={refresh}
+        />
 
-      <ViewTabPills>
-        <ViewTabBtn active={section === 'overview'} onClick={() => setSection('overview')} icon={LayoutDashboard}>
-          Vue d&apos;ensemble
-        </ViewTabBtn>
-        <ViewTabBtn active={section === 'challenge'} onClick={() => setSection('challenge')} icon={Target}>
-          Défi
-        </ViewTabBtn>
-        <ViewTabBtn active={section === 'quotes'} onClick={() => setSection('quotes')} icon={MessageSquareQuote}>
-          Citations
-        </ViewTabBtn>
-        <ViewTabBtn active={section === 'awards'} onClick={() => setSection('awards')} icon={Award}>
-          Prix
-        </ViewTabBtn>
-        <ViewTabBtn active={section === 'ranking'} onClick={() => setSection('ranking')} icon={Medal}>
-          Classement
-        </ViewTabBtn>
-      </ViewTabPills>
+        <nav className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+          {TABS.map(({ id, label, icon: Icon }) => {
+            const active = section === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setSection(id)}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-300 ${
+                  active
+                    ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg ts-tab-active scale-[1.02]'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:border-violet-300 hover:text-violet-700 hover:shadow-md'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </button>
+            );
+          })}
+        </nav>
 
-      {section === 'overview' && (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2 space-y-6">
-            <section>
-              <ViewSectionTitle icon={Bot} title="Popi-Bot" />
-              <div className="mt-4">
+        {section === 'overview' && (
+          <div className="space-y-6">
+            <PodiumTop3 leaderboard={leaderboard} currentUserId={member.id} />
+
+            <PhotoWall quotes={scopedQuotes} responses={scopedResponses} weekKey={weekKey} />
+
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+              <div className="xl:col-span-7 space-y-6">
                 <TaquinCarousel messages={taquinMessages} />
-              </div>
-            </section>
-            <section>
-              <ViewSectionTitle icon={Target} title="Défi de la semaine" count={weekResponses.length} />
-              <div className="mt-4">
                 <WeeklyChallengePanel
                   challenge={challenge}
-                  responses={responses}
+                  responses={scopedResponses}
                   currentUserId={member.id}
                   currentUserName={member.name}
                   onSubmit={handleChallengeSubmit}
@@ -266,49 +304,48 @@ export function TeamSpaceView() {
                   compact
                 />
               </div>
-            </section>
-            <section>
-              <ViewSectionTitle icon={Award} title="Prix de la semaine" count={weeklyAwards.length} />
-              <div className="mt-4">
+              <div className="xl:col-span-5 space-y-6">
                 <WeeklyAwardsPanel awards={weeklyAwards} horizontal />
+                <QuotesWallPanel
+                  quotes={scopedQuotes}
+                  currentUserId={member.id}
+                  currentUserName={member.name}
+                  onPublish={handlePublishQuote}
+                  onVote={handleVoteQuote}
+                  compact
+                />
               </div>
-            </section>
-          </div>
-          <aside>
-            <ViewSectionTitle icon={Medal} title="Classement" count={sortedLeaderboard.length} />
-            <div className="mt-4">
-              <LeaderboardPanel leaderboard={leaderboard} currentUserId={member.id} compact />
             </div>
-          </aside>
-        </div>
-      )}
+          </div>
+        )}
 
-      {section === 'challenge' && (
-        <WeeklyChallengePanel
-          challenge={challenge}
-          responses={responses}
-          currentUserId={member.id}
-          currentUserName={member.name}
-          onSubmit={handleChallengeSubmit}
-          onLike={handleChallengeLike}
-        />
-      )}
+        {section === 'challenge' && (
+          <WeeklyChallengePanel
+            challenge={challenge}
+            responses={scopedResponses}
+            currentUserId={member.id}
+            currentUserName={member.name}
+            onSubmit={handleChallengeSubmit}
+            onLike={handleChallengeLike}
+          />
+        )}
 
-      {section === 'quotes' && (
-        <QuotesWallPanel
-          quotes={quotes}
-          currentUserId={member.id}
-          currentUserName={member.name}
-          onPublish={handlePublishQuote}
-          onVote={handleVoteQuote}
-        />
-      )}
+        {section === 'quotes' && (
+          <QuotesWallPanel
+            quotes={scopedQuotes}
+            currentUserId={member.id}
+            currentUserName={member.name}
+            onPublish={handlePublishQuote}
+            onVote={handleVoteQuote}
+          />
+        )}
 
-      {section === 'awards' && <WeeklyAwardsPanel awards={weeklyAwards} />}
+        {section === 'awards' && <WeeklyAwardsPanel awards={weeklyAwards} />}
 
-      {section === 'ranking' && (
-        <LeaderboardPanel leaderboard={leaderboard} currentUserId={member.id} />
-      )}
-    </ViewShell>
+        {section === 'ranking' && (
+          <LeaderboardPanel leaderboard={leaderboard} currentUserId={member.id} />
+        )}
+      </ViewShell>
+    </TeamSpacePhotoProvider>
   );
 }

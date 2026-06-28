@@ -1,9 +1,14 @@
 import type { TestTask } from '../data/testData';
-import { TEST_TEAM_MEMBERS } from '../data/testData';
+import type { TeamMemberData } from '../data/testTeamData';
 import type { ScrumMeetingRecord } from '../types/scrumMeetings';
 import type { WeeklyAward, WeeklyAwardType } from '../types/teamSpace';
 import { AWARD_META } from '../types/teamSpace';
 import { getWeekKey, isInCurrentWeek } from './teamSpaceTime';
+import {
+  loadTeamMembers,
+  resolveTeamMemberId,
+  resolveTeamMemberName,
+} from './teamMemberStore';
 
 function countBy<T>(items: T[], keyFn: (item: T) => string): Map<string, number> {
   const m = new Map<string, number>();
@@ -19,20 +24,19 @@ function topEntry(map: Map<string, number>): [string, number] | null {
   return sorted[0] && sorted[0][1] > 0 ? sorted[0] : null;
 }
 
-function resolveName(idOrName: string): string {
-  const m = TEST_TEAM_MEMBERS.find((x) => x.id === idOrName || x.name === idOrName);
-  return m?.name ?? idOrName;
+function resolveName(idOrName: string, roster: TeamMemberData[]): string {
+  return resolveTeamMemberName(idOrName, roster);
 }
 
-function resolveId(idOrName: string): string {
-  const m = TEST_TEAM_MEMBERS.find((x) => x.id === idOrName || x.name === idOrName);
-  return m?.id ?? idOrName;
+function resolveId(idOrName: string, roster: TeamMemberData[]): string {
+  return resolveTeamMemberId(idOrName, roster);
 }
 
 export function computeWeeklyAwards(
   tasks: TestTask[],
   meetings: ScrumMeetingRecord[],
-  ref = new Date()
+  ref = new Date(),
+  roster: TeamMemberData[] = loadTeamMembers()
 ): WeeklyAward[] {
   const weekKey = getWeekKey(ref);
   const awards: WeeklyAward[] = [];
@@ -43,8 +47,8 @@ export function computeWeeklyAwards(
     const meta = AWARD_META.rocket;
     awards.push({
       type: 'rocket',
-      memberId: rocketTop[0],
-      memberName: resolveName(rocketTop[0]),
+      memberId: resolveId(rocketTop[0], roster),
+      memberName: resolveName(rocketTop[0], roster),
       value: rocketTop[1],
       label: meta.title,
       weekKey,
@@ -62,8 +66,8 @@ export function computeWeeklyAwards(
     const meta = AWARD_META['bug-hunter'];
     awards.push({
       type: 'bug-hunter',
-      memberId: bugTop[0],
-      memberName: resolveName(bugTop[0]),
+      memberId: resolveId(bugTop[0], roster),
+      memberName: resolveName(bugTop[0], roster),
       value: bugTop[1],
       label: meta.title,
       weekKey,
@@ -78,8 +82,8 @@ export function computeWeeklyAwards(
     const meta = AWARD_META.punctuality;
     awards.push({
       type: 'punctuality',
-      memberId: punctTop[0],
-      memberName: resolveName(punctTop[0]),
+      memberId: resolveId(punctTop[0], roster),
+      memberName: resolveName(punctTop[0], roster),
       value: punctTop[1],
       label: meta.title,
       weekKey,
@@ -90,7 +94,7 @@ export function computeWeeklyAwards(
   const meetingCounts = new Map<string, number>();
   for (const m of weekMeetings) {
     for (const p of m.participants ?? []) {
-      const id = resolveId(p);
+      const id = resolveId(p, roster);
       meetingCounts.set(id, (meetingCounts.get(id) ?? 0) + 1);
     }
   }
@@ -99,8 +103,8 @@ export function computeWeeklyAwards(
     const meta = AWARD_META['meeting-king'];
     awards.push({
       type: 'meeting-king',
-      memberId: meetTop[0],
-      memberName: resolveName(meetTop[0]),
+      memberId: resolveId(meetTop[0], roster),
+      memberName: resolveName(meetTop[0], roster),
       value: meetTop[1],
       label: meta.title,
       weekKey,
@@ -110,23 +114,23 @@ export function computeWeeklyAwards(
   const nightScores = new Map<string, number>();
   for (const t of doneWeek) {
     const hour = 17 + (t.id.charCodeAt(t.id.length - 1) % 6);
-    nightScores.set(t.assignedTo, Math.max(nightScores.get(t.assignedTo) ?? 0, hour));
+    nightScores.set(resolveId(t.assignedTo, roster), Math.max(nightScores.get(resolveId(t.assignedTo, roster)) ?? 0, hour));
   }
   const nightTop = topEntry(nightScores);
   if (nightTop) {
     const meta = AWARD_META['night-owl'];
     awards.push({
       type: 'night-owl',
-      memberId: nightTop[0],
-      memberName: resolveName(nightTop[0]),
+      memberId: resolveId(nightTop[0], roster),
+      memberName: resolveName(nightTop[0], roster),
       value: nightTop[1],
       label: meta.title,
       weekKey,
     });
   }
 
-  if (awards.length === 0) {
-    const fallback = TEST_TEAM_MEMBERS[0];
+  if (awards.length === 0 && roster.length > 0) {
+    const fallback = roster[0];
     awards.push({
       type: 'rocket',
       memberId: fallback.id,

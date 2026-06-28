@@ -1,0 +1,123 @@
+/* Espace Équipe — animations & spectacle */
+
+@keyframes ts-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes ts-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes ts-podium-rise {
+  from { opacity: 0; transform: translateY(24px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes ts-glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.25); }
+  50% { box-shadow: 0 0 36px rgba(139, 92, 246, 0.45); }
+}
+
+@keyframes ts-sparkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+@keyframes ts-slide-in {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes ts-scale-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.team-space-shell {
+  max-width: 100rem !important;
+  gap: 1.25rem;
+}
+
+.team-space-bg {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  background: linear-gradient(135deg, #faf5ff 0%, #f0f9ff 40%, #fdf4ff 100%);
+  border: 1px solid rgba(139, 92, 246, 0.12);
+}
+
+.team-space-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(167, 139, 250, 0.18) 0%, transparent 45%),
+    radial-gradient(circle at 85% 75%, rgba(56, 189, 248, 0.15) 0%, transparent 40%);
+  pointer-events: none;
+}
+
+.ts-animate-float {
+  animation: ts-float 4s ease-in-out infinite;
+}
+
+.ts-animate-podium {
+  animation: ts-podium-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.ts-animate-podium:nth-child(1) { animation-delay: 0.15s; }
+.ts-animate-podium:nth-child(2) { animation-delay: 0s; }
+.ts-animate-podium:nth-child(3) { animation-delay: 0.25s; }
+
+.ts-animate-in {
+  animation: ts-scale-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.ts-card-glow {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.ts-card-glow:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 40px -12px rgba(99, 102, 241, 0.25);
+}
+
+.ts-shimmer-text {
+  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #6366f1);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ts-shimmer 4s linear infinite;
+}
+
+.ts-sparkle {
+  animation: ts-sparkle 2s ease-in-out infinite;
+}
+
+.ts-tab-active {
+  animation: ts-glow-pulse 2.5s ease-in-out infinite;
+}
+
+.ts-photo-tile {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.ts-photo-tile:hover {
+  transform: scale(1.03);
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+
+.ts-podium-gold {
+  background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 55%, #d97706 100%);
+}
+
+.ts-podium-silver {
+  background: linear-gradient(180deg, #e2e8f0 0%, #94a3b8 55%, #64748b 100%);
+}
+
+.ts-podium-bronze {
+  background: linear-gradient(180deg, #fdba74 0%, #ea580c 55%, #c2410c 100%);
+}

@@ -2,12 +2,18 @@ import { DEMO_CHALLENGE_RESPONSES, DEMO_QUOTES } from '../data/teamSpaceDemo';
 import type { ChallengeResponse, MemberPoints, TeamQuote } from '../types/teamSpace';
 import { POINTS_RULES } from '../types/teamSpace';
 import { getMonthKey, getWeekKey } from './teamSpaceTime';
+import { seedMemberPhotoFixtures, migrateLegacyMemberPhotos } from './teamSpacePhotos';
+import {
+  LEGACY_TASK_USER_TO_TEAM_ID,
+  findTeamMember,
+  loadTeamMembers,
+} from './teamMemberStore';
 
 export const QUOTES_STORAGE_KEY = 'popilot:team-space-quotes';
 export const CHALLENGE_RESPONSES_KEY = 'popilot:team-space-challenge-responses';
 export const POINTS_STORAGE_KEY = 'popilot:team-space-points';
 export const TEAM_SPACE_SEED_KEY = 'popilot:team-space-seed';
-const TEAM_SPACE_SEED_VERSION = '2';
+const TEAM_SPACE_SEED_VERSION = '5';
 
 function upsertDemoByIds<T extends { id: string }>(saved: T[], demo: T[], demoIds: readonly string[]): T[] {
   const replace = new Set(demoIds);
@@ -33,18 +39,109 @@ function writeJson(key: string, data: unknown): void {
   }
 }
 
-export function loadQuotes(): TeamQuote[] {
-  const saved = readJson<TeamQuote[]>(QUOTES_STORAGE_KEY, []);
-  const merged = upsertDemoByIds(saved, DEMO_QUOTES, DEMO_QUOTES.map((q) => q.id));
-  try {
-    if (localStorage.getItem(TEAM_SPACE_SEED_KEY) !== TEAM_SPACE_SEED_VERSION) {
-      localStorage.setItem(QUOTES_STORAGE_KEY, JSON.stringify(merged));
-      localStorage.setItem(TEAM_SPACE_SEED_KEY, TEAM_SPACE_SEED_VERSION);
+function remapLegacyId(id: string): string {
+  return LEGACY_TASK_USER_TO_TEAM_ID[id] ?? id;
+}
+
+function migrateLegacyPoints(): void {
+  const all = readJson<Record<string, MemberPoints>>(POINTS_STORAGE_KEY, {});
+  let changed = false;
+
+  for (const [legacyId, teamId] of Object.entries(LEGACY_TASK_USER_TO_TEAM_ID)) {
+    if (!all[legacyId]) continue;
+    const legacy = all[legacyId];
+    const existing = all[teamId];
+    if (existing) {
+      all[teamId] = {
+        ...existing,
+        memberId: teamId,
+        memberName: existing.memberName || legacy.memberName,
+        total: existing.total + legacy.total,
+        monthly: existing.monthly + legacy.monthly,
+        history: [...legacy.history, ...existing.history].slice(0, 30),
+      };
+    } else {
+      all[teamId] = { ...legacy, memberId: teamId };
     }
+    delete all[legacyId];
+    changed = true;
+  }
+
+  if (changed) {
+    localStorage.setItem(POINTS_STORAGE_KEY, JSON.stringify(all));
+  }
+}
+
+function migrateStoredQuotes(quotes: TeamQuote[]): TeamQuote[] {
+  const roster = loadTeamMembers();
+  return quotes
+    .map((q) => {
+      const author = findTeamMember(remapLegacyId(q.authorId), roster);
+      if (!author) return null;
+      const votes = [
+        ...new Set(
+          q.votes
+            .map((v) => findTeamMember(remapLegacyId(v), roster)?.id)
+            .filter((v): v is string => Boolean(v))
+        ),
+      ];
+      return { ...q, authorId: author.id, authorName: author.name, votes };
+    })
+    .filter((q): q is TeamQuote => q !== null);
+}
+
+function migrateStoredResponses(responses: ChallengeResponse[]): ChallengeResponse[] {
+  const roster = loadTeamMembers();
+  return responses
+    .map((r) => {
+      const author = findTeamMember(remapLegacyId(r.authorId), roster);
+      if (!author) return null;
+      const likes = [
+        ...new Set(
+          r.likes
+            .map((l) => findTeamMember(remapLegacyId(l), roster)?.id)
+            .filter((l): l is string => Boolean(l))
+        ),
+      ];
+      return { ...r, authorId: author.id, authorName: author.name, likes };
+    })
+    .filter((r): r is ChallengeResponse => r !== null);
+}
+
+function ensureTeamSpaceSeed(): void {
+  try {
+    if (localStorage.getItem(TEAM_SPACE_SEED_KEY) === TEAM_SPACE_SEED_VERSION) return;
+
+    migrateLegacyPoints();
+    migrateLegacyMemberPhotos();
+
+    const savedQuotes = migrateStoredQuotes(readJson<TeamQuote[]>(QUOTES_STORAGE_KEY, []));
+    const mergedQuotes = upsertDemoByIds(savedQuotes, DEMO_QUOTES, DEMO_QUOTES.map((q) => q.id));
+    localStorage.setItem(QUOTES_STORAGE_KEY, JSON.stringify(mergedQuotes));
+
+    const savedResponses = migrateStoredResponses(
+      readJson<ChallengeResponse[]>(CHALLENGE_RESPONSES_KEY, [])
+    );
+    const weekKey = getWeekKey();
+    const demoResponses = DEMO_CHALLENGE_RESPONSES.map((r) => ({ ...r, weekKey }));
+    const mergedResponses = upsertDemoByIds(
+      savedResponses,
+      demoResponses,
+      DEMO_CHALLENGE_RESPONSES.map((r) => r.id)
+    );
+    localStorage.setItem(CHALLENGE_RESPONSES_KEY, JSON.stringify(mergedResponses));
+
+    seedMemberPhotoFixtures(true);
+    localStorage.setItem(TEAM_SPACE_SEED_KEY, TEAM_SPACE_SEED_VERSION);
   } catch {
     /* ignore */
   }
-  return merged;
+}
+
+export function loadQuotes(): TeamQuote[] {
+  ensureTeamSpaceSeed();
+  const saved = readJson<TeamQuote[]>(QUOTES_STORAGE_KEY, []);
+  return upsertDemoByIds(saved, DEMO_QUOTES, DEMO_QUOTES.map((q) => q.id));
 }
 
 export function saveQuotes(quotes: TeamQuote[]): void {
@@ -52,18 +149,11 @@ export function saveQuotes(quotes: TeamQuote[]): void {
 }
 
 export function loadChallengeResponses(): ChallengeResponse[] {
+  ensureTeamSpaceSeed();
   const saved = readJson<ChallengeResponse[]>(CHALLENGE_RESPONSES_KEY, []);
   const weekKey = getWeekKey();
   const demo = DEMO_CHALLENGE_RESPONSES.map((r) => ({ ...r, weekKey }));
-  const merged = upsertDemoByIds(saved, demo, DEMO_CHALLENGE_RESPONSES.map((r) => r.id));
-  try {
-    if (localStorage.getItem(TEAM_SPACE_SEED_KEY) !== TEAM_SPACE_SEED_VERSION) {
-      localStorage.setItem(CHALLENGE_RESPONSES_KEY, JSON.stringify(merged));
-    }
-  } catch {
-    /* ignore */
-  }
-  return merged;
+  return upsertDemoByIds(saved, demo, DEMO_CHALLENGE_RESPONSES.map((r) => r.id));
 }
 
 export function saveChallengeResponses(responses: ChallengeResponse[]): void {

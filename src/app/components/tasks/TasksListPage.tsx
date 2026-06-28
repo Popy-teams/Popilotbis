@@ -3,8 +3,9 @@ import type { TestTask, TestTeamMember } from '../../data/testData';
 import { calculateTaskProgress } from '../../data/testData';
 import type { PipelineStage } from '../../types/planning';
 import { ViewShell } from '../shared';
-import { TasksToolbar } from './TasksToolbar';
+import { TasksToolbar, type TasksViewMode } from './TasksToolbar';
 import { TasksTable, TasksEmptyState } from './TasksTable';
+import { TasksKanbanBoard } from './TasksKanbanBoard';
 
 interface TasksListPageProps {
   projectName: string;
@@ -15,6 +16,7 @@ interface TasksListPageProps {
   onOpen: (task: TestTask) => void;
   onEdit: (task: TestTask) => void;
   onDelete: (task: TestTask) => void;
+  onStatusChange: (taskId: string, status: TestTask['status']) => void;
 }
 
 export function TasksListPage({
@@ -26,10 +28,12 @@ export function TasksListPage({
   onOpen,
   onEdit,
   onDelete,
+  onStatusChange,
 }: TasksListPageProps) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [viewMode, setViewMode] = useState<TasksViewMode>('kanban');
 
   const stats = useMemo(() => {
     const overdue = tasks.filter(
@@ -51,7 +55,7 @@ export function TasksListPage({
     const q = query.trim().toLowerCase();
     return tasks
       .filter((task) => {
-        if (statusFilter !== 'all' && task.status !== statusFilter) return false;
+        if (viewMode === 'table' && statusFilter !== 'all' && task.status !== statusFilter) return false;
         if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false;
         if (!q) return true;
         return (
@@ -61,24 +65,34 @@ export function TasksListPage({
         );
       })
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  }, [tasks, query, statusFilter, priorityFilter]);
+  }, [tasks, query, statusFilter, priorityFilter, viewMode]);
 
   return (
-    <ViewShell>
+    <ViewShell className="!max-w-[100rem]">
       <TasksToolbar
         projectName={projectName}
         query={query}
         statusFilter={statusFilter}
         priorityFilter={priorityFilter}
+        viewMode={viewMode}
         stats={stats}
         onQueryChange={setQuery}
         onStatusFilterChange={setStatusFilter}
         onPriorityFilterChange={setPriorityFilter}
+        onViewModeChange={setViewMode}
         onCreate={onCreate}
       />
 
       {filtered.length === 0 ? (
         <TasksEmptyState onCreate={onCreate} />
+      ) : viewMode === 'kanban' ? (
+        <TasksKanbanBoard
+          tasks={filtered}
+          members={members}
+          stages={stages}
+          onOpen={onOpen}
+          onStatusChange={onStatusChange}
+        />
       ) : (
         <TasksTable
           tasks={filtered}

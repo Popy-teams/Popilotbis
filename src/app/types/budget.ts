@@ -1,14 +1,10 @@
 // Types pour le système budgétaire POPILOT - Conforme ISO 9001 §7.1
 
-export type BOMCategory =
-  | 'brain-ai'
-  | 'vision'
-  | 'audio'
-  | 'movement'
-  | 'visual-interface'
-  | 'power'
-  | 'structure'
-  | 'electronics';
+/** Identifiant de catégorie BOM (built-in ou personnalisé) */
+export type BOMCategoryId = string;
+
+/** @deprecated Alias — préférer BOMCategoryId */
+export type BOMCategory = BOMCategoryId;
 
 export type ComponentStatus =
   | 'to-quote'
@@ -24,7 +20,7 @@ export type ComponentCriticality = 'low' | 'medium' | 'critical';
 export interface BOMComponent {
   id: string;
   projectId?: string;
-  category: BOMCategory;
+  category: BOMCategoryId;
   name: string;
   functionalName: string;
   example: string; // Référence précise du modèle
@@ -58,6 +54,19 @@ export interface BOMComponent {
 
 export type QuoteStatus = 'received' | 'accepted' | 'rejected' | 'pending';
 
+export interface BudgetLink {
+  id: string;
+  label: string;
+  url: string;
+}
+
+export interface BudgetDocument {
+  id: string;
+  name: string;
+  url: string;
+  uploadedAt: string;
+}
+
 export interface Quote {
   id: string;
   reference: string;
@@ -89,6 +98,8 @@ export interface Quote {
   
   // Métadonnées
   notes?: string;
+  links?: BudgetLink[];
+  documents?: BudgetDocument[];
   createdAt: string;
   createdBy: string;
 }
@@ -128,6 +139,28 @@ export interface Supplier {
   
   // Métadonnées
   notes?: string;
+  links?: BudgetLink[];
+  documents?: BudgetDocument[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type FundingStatus = 'explore' | 'in-progress' | 'won' | 'lost' | 'later';
+
+export interface FundingSource {
+  id: string;
+  projectId?: string;
+  title: string;
+  description: string;
+  amountLabel: string;
+  amountMin?: number;
+  amountMax?: number;
+  status: FundingStatus;
+  deadline?: string;
+  successRate?: string;
+  links?: BudgetLink[];
+  documents?: BudgetDocument[];
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -135,19 +168,19 @@ export interface Supplier {
 export interface BudgetTracking {
   // Estimations initiales
   estimatedTotal: number;
-  estimatedByCategory: Record<BOMCategory, number>;
+  estimatedByCategory: Record<string, number>;
   
   // Budget validé (devis acceptés)
   validatedTotal: number;
-  validatedByCategory: Record<BOMCategory, number>;
+  validatedByCategory: Record<string, number>;
   
   // Budget engagé (commandes passées)
   committedTotal: number;
-  committedByCategory: Record<BOMCategory, number>;
+  committedByCategory: Record<string, number>;
   
   // Budget réel (reçu)
   actualTotal: number;
-  actualByCategory: Record<BOMCategory, number>;
+  actualByCategory: Record<string, number>;
   
   // Écarts
   deviationAmount: number;
@@ -161,7 +194,7 @@ export interface BudgetAlert {
   id: string;
   type: 'overspend' | 'critical-missing' | 'sole-source' | 'delay-risk' | 'price-increase';
   severity: 'info' | 'warning' | 'critical';
-  category?: BOMCategory;
+  category?: BOMCategoryId;
   componentId?: string;
   supplierId?: string;
   message: string;
@@ -171,8 +204,8 @@ export interface BudgetAlert {
 }
 
 // Helpers
-export function getBOMCategoryLabel(category: BOMCategory): string {
-  const labels: Record<BOMCategory, string> = {
+export function getBOMCategoryLabel(category: BOMCategoryId): string {
+  const labels: Record<string, string> = {
     'brain-ai': 'Cerveau & IA',
     'vision': 'Vision & Perception',
     'audio': 'Audio (Micros + HP)',
@@ -180,9 +213,9 @@ export function getBOMCategoryLabel(category: BOMCategory): string {
     'visual-interface': 'Interface Visuelle & LEDs',
     'power': 'Alimentation & Batterie',
     'structure': 'Structure & Mécanique',
-    'electronics': 'Électronique d\'Intégration',
+    'electronics': "Électronique d'Intégration",
   };
-  return labels[category];
+  return labels[category] ?? category;
 }
 
 export function getComponentStatusLabel(status: ComponentStatus): string {
@@ -230,32 +263,51 @@ export function getSupplierTypeLabel(type: SupplierType): string {
   return labels[type];
 }
 
+export function getFundingStatusLabel(status: FundingStatus): string {
+  const labels: Record<FundingStatus, string> = {
+    explore: 'À explorer',
+    'in-progress': 'En cours',
+    won: 'Obtenu',
+    lost: 'Refusé',
+    later: 'Phase ultérieure',
+  };
+  return labels[status];
+}
+
+export function getFundingStatusColor(status: FundingStatus): string {
+  const colors: Record<FundingStatus, string> = {
+    explore: 'bg-blue-100 text-blue-800',
+    'in-progress': 'bg-orange-100 text-orange-800',
+    won: 'bg-emerald-100 text-emerald-800',
+    lost: 'bg-red-100 text-red-800',
+    later: 'bg-slate-100 text-slate-700',
+  };
+  return colors[status];
+}
+
+export function getQuoteStatusLabel(status: QuoteStatus): string {
+  const labels: Record<QuoteStatus, string> = {
+    accepted: 'Accepté',
+    rejected: 'Refusé',
+    received: 'Reçu',
+    pending: 'En attente',
+  };
+  return labels[status];
+}
+
 export function calculateBudgetTracking(
   components: BOMComponent[],
-  quotes: Quote[]
+  _quotes: Quote[],
+  categoryIds?: string[]
 ): BudgetTracking {
-  const categories: BOMCategory[] = [
-    'brain-ai',
-    'vision',
-    'audio',
-    'movement',
-    'visual-interface',
-    'power',
-    'structure',
-    'electronics',
-  ];
+  const ids =
+    categoryIds ??
+    [...new Set(components.map((c) => c.category))].sort();
 
-  const estimatedByCategory = {} as Record<BOMCategory, number>;
-  const validatedByCategory = {} as Record<BOMCategory, number>;
-  const committedByCategory = {} as Record<BOMCategory, number>;
-  const actualByCategory = {} as Record<BOMCategory, number>;
-
-  categories.forEach((cat) => {
-    estimatedByCategory[cat] = 0;
-    validatedByCategory[cat] = 0;
-    committedByCategory[cat] = 0;
-    actualByCategory[cat] = 0;
-  });
+  const estimatedByCategory = Object.fromEntries(ids.map((id) => [id, 0])) as Record<string, number>;
+  const validatedByCategory = { ...estimatedByCategory };
+  const committedByCategory = { ...estimatedByCategory };
+  const actualByCategory = { ...estimatedByCategory };
 
   let estimatedTotal = 0;
   let validatedTotal = 0;
@@ -263,6 +315,13 @@ export function calculateBudgetTracking(
   let actualTotal = 0;
 
   components.forEach((comp) => {
+    if (!(comp.category in estimatedByCategory)) {
+      estimatedByCategory[comp.category] = 0;
+      validatedByCategory[comp.category] = 0;
+      committedByCategory[comp.category] = 0;
+      actualByCategory[comp.category] = 0;
+    }
+
     estimatedTotal += comp.totalEstimated;
     estimatedByCategory[comp.category] += comp.totalEstimated;
 

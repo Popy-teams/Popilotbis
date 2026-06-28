@@ -5,14 +5,19 @@ import {
   CheckCircle2,
   AlertTriangle,
   TrendingUp,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { FormSelect, SearchField, ViewHero, ViewStatCard, ViewStatsGrid, ViewFilterPanel, ViewTabPills, ViewTabBtn } from '../shared';
+
+export type TasksViewMode = 'kanban' | 'table';
 
 interface TasksToolbarProps {
   projectName: string;
   query: string;
   statusFilter: string;
   priorityFilter: string;
+  viewMode: TasksViewMode;
   stats: {
     total: number;
     inProgress: number;
@@ -23,6 +28,7 @@ interface TasksToolbarProps {
   onQueryChange: (v: string) => void;
   onStatusFilterChange: (v: string) => void;
   onPriorityFilterChange: (v: string) => void;
+  onViewModeChange: (mode: TasksViewMode) => void;
   onCreate: () => void;
 }
 
@@ -39,10 +45,12 @@ export function TasksToolbar({
   query,
   statusFilter,
   priorityFilter,
+  viewMode,
   stats,
   onQueryChange,
   onStatusFilterChange,
   onPriorityFilterChange,
+  onViewModeChange,
   onCreate,
 }: TasksToolbarProps) {
   return (
@@ -84,21 +92,6 @@ export function TasksToolbar({
           />
         </div>
 
-        <div>
-          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Statut</label>
-          <ViewTabPills>
-            {STATUS_PILLS.map((pill) => (
-              <ViewTabBtn
-                key={pill.id}
-                active={statusFilter === pill.id}
-                onClick={() => onStatusFilterChange(pill.id)}
-              >
-                {pill.label}
-              </ViewTabBtn>
-            ))}
-          </ViewTabPills>
-        </div>
-
         <div className="flex flex-col sm:flex-row sm:items-end gap-3 pt-1 border-t border-slate-100">
           <div className="w-full sm:w-48">
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Priorité</label>
@@ -113,7 +106,44 @@ export function TasksToolbar({
               <option value="low">Basse</option>
             </FormSelect>
           </div>
+
+          <div className="sm:ml-auto">
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Affichage</label>
+            <ViewTabPills>
+              <ViewTabBtn
+                active={viewMode === 'kanban'}
+                onClick={() => onViewModeChange('kanban')}
+                icon={LayoutGrid}
+              >
+                Kanban
+              </ViewTabBtn>
+              <ViewTabBtn
+                active={viewMode === 'table'}
+                onClick={() => onViewModeChange('table')}
+                icon={List}
+              >
+                Liste
+              </ViewTabBtn>
+            </ViewTabPills>
+          </div>
         </div>
+
+        {viewMode === 'table' ? (
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Statut</label>
+            <ViewTabPills>
+              {STATUS_PILLS.map((pill) => (
+                <ViewTabBtn
+                  key={pill.id}
+                  active={statusFilter === pill.id}
+                  onClick={() => onStatusFilterChange(pill.id)}
+                >
+                  {pill.label}
+                </ViewTabBtn>
+              ))}
+            </ViewTabPills>
+          </div>
+        ) : null}
       </ViewFilterPanel>
     </>
   );

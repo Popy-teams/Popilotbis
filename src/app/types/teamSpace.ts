@@ -44,6 +44,7 @@ export interface TeamQuote {
   authorId: string;
   authorName: string;
   context?: string;
+  imageUrl?: string;
   createdAt: string;
   votes: string[];
 }
@@ -55,6 +56,7 @@ export interface ChallengeResponse {
   authorId: string;
   authorName: string;
   content: string;
+  imageUrl?: string;
   createdAt: string;
   likes: string[];
 }

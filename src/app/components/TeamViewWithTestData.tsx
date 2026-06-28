@@ -64,7 +64,7 @@ import {
   type PositionFormValues,
 } from './team/PositionFormPage';
 
-const TEAM_STORAGE_KEY = 'popilot:team-local';
+import { TEAM_STORAGE_KEY } from '../utils/teamMemberStore';
 
 type MainTab = 'members' | 'positions';
 type MemberMode = 'list' | 'create' | 'view' | 'edit';
@@ -155,6 +155,7 @@ export function TeamViewWithTestData() {
   useEffect(() => {
     try {
       localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(members));
+      window.dispatchEvent(new CustomEvent('popilot:team-updated'));
     } catch {
       // ignore
     }
