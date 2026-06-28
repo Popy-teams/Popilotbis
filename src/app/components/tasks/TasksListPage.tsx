@@ -68,7 +68,7 @@ export function TasksListPage({
   }, [tasks, query, statusFilter, priorityFilter, viewMode]);
 
   return (
-    <ViewShell className="!max-w-[100rem]">
+    <ViewShell>
       <TasksToolbar
         projectName={projectName}
         query={query}

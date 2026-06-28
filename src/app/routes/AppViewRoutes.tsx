@@ -17,6 +17,7 @@ import { MarketingStrategyView } from '../components/MarketingStrategyView';
 import { SatisfactionView } from '../components/SatisfactionView';
 import { AuditView } from '../components/AuditView';
 import { KPIView } from '../components/KPIView';
+import { PdcaView } from '../components/pdca/PdcaView';
 import type { ViewType } from './viewRoutes';
 
 export const VIEW_ELEMENTS: Record<ViewType, ReactNode> = {
@@ -37,5 +38,6 @@ export const VIEW_ELEMENTS: Record<ViewType, ReactNode> = {
   satisfaction: <SatisfactionView />,
   audit: <AuditView />,
   kpi: <KPIView />,
+  pdca: <PdcaView />,
   documentation: <DocumentationView />,
 };

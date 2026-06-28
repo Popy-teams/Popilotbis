@@ -387,7 +387,7 @@ export function BudgetFeature() {
     !editingCategory.isBuiltIn &&
     !scopedBomComponents.some((c) => c.category === editingCategory.id);
 
-  const shellClass = 'p-4 sm:p-6 max-w-[1600px] mx-auto budget-shell';
+  const shellClass = 'view-shell budget-shell';
 
   if (screen.type === 'component' && (screen.mode === 'create' || screen.mode === 'edit')) {
     return (

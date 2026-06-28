@@ -38,7 +38,7 @@ export function BudgetPageChrome({
   maxWidth = 'lg',
 }: BudgetPageChromeProps) {
   return (
-    <div className={`budget-page ${maxW[maxWidth]} mx-auto w-full px-0 sm:px-1 space-y-4 pb-8`}>
+    <div className={`budget-page ${maxW[maxWidth]} w-full px-0 sm:px-1 space-y-4 pb-8`}>
       <BudgetBreadcrumbs crumbs={crumbs} />
 
       <header className={`budget-page-header ${accentClass[accent]}`}>

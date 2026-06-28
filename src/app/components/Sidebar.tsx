@@ -1,7 +1,9 @@
 import { NavLink } from 'react-router';
 import { ChevronRight, X } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import type { AuthUser } from '../auth/authApi';
 import { APP_ROUTES, type NavSection } from '../routes/viewRoutes';
+import { NAV_ICON_THEMES } from '../routes/navIconThemes';
 import { AppIcon } from './shared/icons';
 import { cn } from './ui/utils';
 
@@ -18,12 +20,6 @@ const SECTIONS: { key: NavSection; title: string }[] = [
   { key: 'quality', title: 'Qualité' },
 ];
 
-const SECTION_ICON_CLASS: Record<NavSection, string> = {
-  personal: 'text-sky-600',
-  management: 'text-indigo-600',
-  quality: 'text-violet-600',
-};
-
 function UserInitials({ name }: { name: string }) {
   return name
     .split(' ')
@@ -36,16 +32,18 @@ function UserInitials({ name }: { name: string }) {
 export function Sidebar({ user, onNavigate, open = false, onClose }: SidebarProps) {
   return (
     <aside
-      className={cn('app-sidebar app-sidebar--mobile', open && 'app-sidebar--open')}
+      className={cn(
+        'app-sidebar',
+        'fixed inset-y-0 left-0 z-50',
+        'md:relative md:z-auto md:shrink-0 md:translate-x-0 md:pointer-events-auto',
+        'transition-transform duration-300 ease-out',
+        'shadow-xl md:shadow-none',
+        open ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none md:translate-x-0'
+      )}
       aria-label="Navigation principale"
     >
-      <div className="app-sidebar__backdrop" aria-hidden>
-        <div className="app-sidebar__orb app-sidebar__orb--1" />
-        <div className="app-sidebar__orb app-sidebar__orb--2" />
-        <div className="app-sidebar__orb app-sidebar__orb--3" />
-      </div>
+      <div className="app-sidebar__backdrop" aria-hidden />
       <div className="app-sidebar__sheen" aria-hidden />
-      <div className="app-sidebar__noise" aria-hidden />
 
       <div className="app-sidebar__inner">
         <header className="app-sidebar__brand">
@@ -58,7 +56,7 @@ export function Sidebar({ user, onNavigate, open = false, onClose }: SidebarProp
                 <h1 className="app-sidebar__title">POPILOT</h1>
                 <div className="app-sidebar__badge">
                   <span className="app-sidebar__badge-dot" aria-hidden />
-                  ISO 9001 Certified
+                  ISO 9001
                 </div>
               </div>
             </div>
@@ -66,7 +64,7 @@ export function Sidebar({ user, onNavigate, open = false, onClose }: SidebarProp
               <button
                 type="button"
                 onClick={onClose}
-                className="app-sidebar__close lg:hidden"
+                className="app-sidebar__close md:hidden"
                 aria-label="Fermer le menu"
               >
                 <AppIcon icon={X} size="sm" />
@@ -84,37 +82,40 @@ export function Sidebar({ user, onNavigate, open = false, onClose }: SidebarProp
               <div key={key} className="app-sidebar__section">
                 <div className="app-sidebar__section-label">{title}</div>
                 <div className="app-sidebar__links">
-                  {items.map((item) => (
-                    <NavLink
-                      key={item.id}
-                      to={`/${item.path}`}
-                      onClick={onNavigate}
-                      data-section={key}
-                      className={({ isActive }) =>
-                        cn('app-sidebar__link', isActive && 'app-sidebar__link--active')
-                      }
-                    >
-                      {({ isActive }) => (
-                        <>
-                          <span className="app-sidebar__reflet" aria-hidden />
-                          <span className="app-sidebar__link-indicator" aria-hidden />
-                          <span className="app-sidebar__icon-wrap">
-                            <AppIcon
-                              icon={item.icon}
-                              size="sm"
-                              className={
-                                isActive ? SECTION_ICON_CLASS[key] : 'text-slate-500'
+                  {items.map((item) => {
+                    const iconTheme = NAV_ICON_THEMES[item.id];
+                    return (
+                      <NavLink
+                        key={item.id}
+                        to={`/${item.path}`}
+                        onClick={onNavigate}
+                        className={({ isActive }) =>
+                          cn('app-sidebar__link', isActive && 'app-sidebar__link--active')
+                        }
+                      >
+                        {({ isActive }) => (
+                          <>
+                            <span
+                              className="app-sidebar__link-indicator"
+                              aria-hidden
+                              style={
+                                isActive && iconTheme.indicator
+                                  ? ({ background: iconTheme.indicator } as CSSProperties)
+                                  : undefined
                               }
                             />
-                          </span>
-                          <span className="app-sidebar__label">{item.label}</span>
-                          {isActive ? (
-                            <ChevronRight className="app-sidebar__chevron" aria-hidden />
-                          ) : null}
-                        </>
-                      )}
-                    </NavLink>
-                  ))}
+                            <span className={cn('app-sidebar__icon-wrap', iconTheme.wrap)}>
+                              <AppIcon icon={item.icon} size="sm" className={iconTheme.icon} />
+                            </span>
+                            <span className="app-sidebar__label">{item.label}</span>
+                            {isActive ? (
+                              <ChevronRight className="app-sidebar__chevron" aria-hidden />
+                            ) : null}
+                          </>
+                        )}
+                      </NavLink>
+                    );
+                  })}
                 </div>
               </div>
             );

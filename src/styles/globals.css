@@ -40,15 +40,15 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 
-  /* SaaS global tokens */
-  --saas-bg: #f8fafc;
+  /* SaaS global tokens — palette stone (alignée sidebar) */
+  --saas-bg: #fafaf9;
   --saas-surface: #ffffff;
-  --saas-surface-muted: #f8fafc;
-  --saas-text: #0f172a;
-  --saas-text-muted: #64748b;
-  --saas-border: #e2e8f0;
-  --saas-primary: #2563eb;
-  --saas-primary-hover: #1d4ed8;
+  --saas-surface-muted: #f5f5f4;
+  --saas-text: #1c1917;
+  --saas-text-muted: #78716c;
+  --saas-border: #e7e5e4;
+  --saas-primary: #44403c;
+  --saas-primary-hover: #292524;
   --saas-success-bg: #dcfce7;
   --saas-success-text: #166534;
   --saas-warning-bg: #fef9c3;
@@ -176,8 +176,8 @@
 
   .saas-input:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
-    border-color: var(--saas-primary);
+    box-shadow: 0 0 0 3px rgba(120, 113, 108, 0.2);
+    border-color: #a8a29e;
   }
 
   /* Listes déroulantes — icônes et chevron responsives */
@@ -388,23 +388,29 @@
     border-color: #cbd5e1;
   }
 
-  /* Layout & responsive — reutilise dans tous les onglets */
+  /* Layout page — aligné à gauche (pas de centrage mx-auto) */
   .view-shell {
     width: 100%;
-    max-width: 80rem;
-    margin-left: auto;
-    margin-right: auto;
-    padding: 1rem;
+    max-width: 100rem;
+    margin: 0;
+    padding: 1rem 1.25rem;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.25rem;
     min-width: 0;
+    box-sizing: border-box;
   }
 
   @media (min-width: 640px) {
     .view-shell {
-      padding: 1.5rem;
+      padding: 1.25rem 1.5rem;
       gap: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .view-shell {
+      padding: 1.5rem 1.75rem;
     }
   }
 
@@ -431,7 +437,7 @@
     font-size: 1.5rem;
     line-height: 2rem;
     font-weight: 700;
-    color: #111827;
+    color: #1c1917;
     letter-spacing: -0.025em;
   }
 
