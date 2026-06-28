@@ -1,895 +1,381 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  Map,
+  Megaphone,
+  Plus,
+  Sparkles,
+  Target,
+  TrendingUp,
+} from 'lucide-react';
 import { useProjectContext } from '../context/ProjectContext';
 import { filterByActiveProject } from '../utils/projectMatch';
 import { DEMO_MARKETING_BY_PROJECT } from '../data/multiProjectDemoFixtures';
 import { mergeDemoData } from '../utils/demoDataMerge';
+import { INITIAL_MARKETING_ACTIONS, ROADMAP_PHASES } from '../data/marketingDemoData';
+import { loadRoadmapForProject, saveRoadmapForProject, applyPhaseTheme } from '../utils/marketingRoadmapStorage';
 import {
-  TrendingUp,
-  DollarSign,
-  Target,
-  Zap,
-  Users,
-  BarChart3,
-  Smartphone,
-  Globe,
-  Award,
-  TrendingDown,
-  ArrowRight,
-  CheckCircle,
-  Calendar,
-  FileText,
-  Link as LinkIcon,
-  Plus,
-  Download,
-  Edit,
-  Instagram,
-  Facebook,
-  Linkedin,
-  Video,
-  MessageCircle,
-  Settings,
-  Heart,
-  Megaphone,
-  Pencil,
-  Trash2,
-  Eye,
-} from 'lucide-react';
-import { PageBackHeader } from './shared/PageBackHeader';
-import { ViewShell, ViewHeader, viewGrids, TableWrap, AppIcon, IconButton, ActionButton } from './shared';
-
-type MarketingPhase = 'year1' | 'year2' | 'year3' | 'year4-5';
-
-interface RoadmapPhase {
-  id: MarketingPhase;
-  year: string;
-  label: string;
-  volume: string;
-  unitCost: string;
-  sellingPrice?: string;
-  margin?: string;
-  color: string;
-  objectives: string[];
-  marketing: string[];
-  risks: string[];
-  linkedTasks?: string[];
-}
-
-type MarketingPageMode = 'list' | 'create' | 'view' | 'edit';
-
-interface MarketingAction {
-  id: string;
-  projectId?: string;
-  title: string;
-  phase: MarketingPhase;
-  channel: string;
-  status: 'planned' | 'in-progress' | 'done';
-  description: string;
-}
-
-const INITIAL_MARKETING_ACTIONS: MarketingAction[] = [
-  { id: 'ma-1', title: 'Storytelling R&D authentique', phase: 'year1', channel: 'LinkedIn', status: 'in-progress', description: 'Série de posts coulisses prototype' },
-  { id: 'ma-2', title: 'Programme ambassadeurs', phase: 'year2', channel: 'Instagram', status: 'planned', description: 'Recrutement early adopters parents' },
-  { id: 'ma-3', title: 'Campagne crowdfunding', phase: 'year3', channel: 'TikTok', status: 'planned', description: 'Validation marché et précommandes' },
-];
-
-const emptyActionForm = { title: '', phase: 'year1' as MarketingPhase, channel: '', status: 'planned' as MarketingAction['status'], description: '' };
+  MARKETING_STORAGE_KEY,
+  type MarketingAction,
+  type MarketingActionStatus,
+  type MarketingPageMode,
+  type MarketingPhase,
+  type MarketingTab,
+  type RoadmapPhase,
+  type RoadmapPhaseFormValues,
+  type StrategyPillar,
+} from '../types/marketing';
+import {
+  ViewShell,
+  ViewHeader,
+  ViewStatCard,
+  ViewStatsGrid,
+  ActionButton,
+} from './shared';
+import { MarketingActionFormPage } from './marketing/MarketingActionFormPage';
+import { MarketingActionDetailPage } from './marketing/MarketingActionDetailPage';
+import { MarketingPhaseFormPage } from './marketing/MarketingPhaseFormPage';
+import { MarketingOverviewTab } from './marketing/MarketingOverviewTab';
+import { MarketingActionsTab } from './marketing/MarketingActionsTab';
+import { MarketingRoadmapTab } from './marketing/MarketingRoadmapTab';
+import { MarketingStrategiesTab } from './marketing/MarketingStrategiesTab';
+import { MarketingChannelsTab } from './marketing/MarketingChannelsTab';
+import { MarketingCharts } from './marketing/MarketingCharts';
+import { MarketingStrategyDetailPage } from './marketing/MarketingStrategyDetailPage';
+import { MarketingPhaseDetailPage } from './marketing/MarketingPhaseDetailPage';
+import { MarketingTabNav } from './marketing/MarketingTabNav';
+import {
+  actionToFormValues,
+  buildActionFromForm,
+  buildPhaseFromForm,
+  computeActionStats,
+  emptyActionForm,
+  phaseToFormValues,
+} from './marketing/marketingPresentation';
+import type { MarketingActionFormValues } from '../types/marketing';
 
 export function MarketingStrategyView() {
-  const { matchesProject, activeProjectSlug } = useProjectContext();
-  const [activePhase, setActivePhase] = useState<MarketingPhase>('year1');
+  const { matchesProject, activeProject, activeProjectSlug, ready } = useProjectContext();
   const [pageMode, setPageMode] = useState<MarketingPageMode>('list');
+  const [activeTab, setActiveTab] = useState<MarketingTab>('overview');
+  const [activePhase, setActivePhase] = useState<MarketingPhase>('year1');
+  const [activeChannelId, setActiveChannelId] = useState('instagram');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterPhase, setFilterPhase] = useState<MarketingPhase | 'all'>('all');
+  const [filterStatus, setFilterStatus] = useState<MarketingActionStatus | 'all'>('all');
   const [actions, setActions] = useState<MarketingAction[]>(INITIAL_MARKETING_ACTIONS);
+  const [phases, setPhases] = useState<RoadmapPhase[]>(ROADMAP_PHASES.map(applyPhaseTheme));
   const [selectedAction, setSelectedAction] = useState<MarketingAction | null>(null);
-  const [form, setForm] = useState(emptyActionForm);
+  const [selectedStrategy, setSelectedStrategy] = useState<StrategyPillar | null>(null);
+  const [selectedPhaseId, setSelectedPhaseId] = useState<MarketingPhase | null>(null);
+  const [form, setForm] = useState<MarketingActionFormValues>(emptyActionForm());
+  const [phaseForm, setPhaseForm] = useState<RoadmapPhaseFormValues | null>(null);
+
+  const projectId = activeProjectSlug ?? 'popy';
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('popilot:marketing-local');
-      if (raw) {
-        setActions(mergeDemoData(JSON.parse(raw) as MarketingAction[], DEMO_MARKETING_BY_PROJECT));
-      } else {
-        setActions((prev) => mergeDemoData(prev, DEMO_MARKETING_BY_PROJECT));
-      }
-    } catch {}
+      const raw = localStorage.getItem(MARKETING_STORAGE_KEY);
+      const saved = raw ? (JSON.parse(raw) as MarketingAction[]) : [];
+      setActions(mergeDemoData(saved, DEMO_MARKETING_BY_PROJECT, INITIAL_MARKETING_ACTIONS));
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {
+    if (!ready) return;
+    setPhases(loadRoadmapForProject(projectId));
+  }, [ready, projectId]);
+
+  useEffect(() => {
     try {
-      localStorage.setItem('popilot:marketing-local', JSON.stringify(actions));
-    } catch {}
+      localStorage.setItem(MARKETING_STORAGE_KEY, JSON.stringify(actions));
+    } catch {
+      /* ignore */
+    }
   }, [actions]);
+
+  useEffect(() => {
+    if (!ready) return;
+    saveRoadmapForProject(projectId, phases);
+  }, [phases, projectId, ready]);
 
   const scopedActions = useMemo(
     () => filterByActiveProject(actions, matchesProject),
     [actions, matchesProject]
   );
 
-  const toAction = (base?: MarketingAction): MarketingAction => ({
-    id: base?.id ?? `ma-${Date.now()}`,
-    projectId: base?.projectId ?? activeProjectSlug ?? 'popy',
-    title: form.title,
-    phase: form.phase,
-    channel: form.channel,
-    status: form.status,
-    description: form.description,
-  });
+  const filteredActions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return scopedActions.filter((a) => {
+      if (filterPhase !== 'all' && a.phase !== filterPhase) return false;
+      if (filterStatus !== 'all' && a.status !== filterStatus) return false;
+      if (!q) return true;
+      return (
+        a.title.toLowerCase().includes(q) ||
+        a.channel.toLowerCase().includes(q) ||
+        a.description.toLowerCase().includes(q)
+      );
+    });
+  }, [scopedActions, searchQuery, filterPhase, filterStatus]);
 
-  const submitActionForm = (e: React.FormEvent) => {
-    e.preventDefault();
-    const next = toAction(pageMode === 'edit' ? selectedAction ?? undefined : undefined);
-    if (pageMode === 'create') setActions((prev) => [...prev, next]);
-    else {
-      setActions((prev) => prev.map((a) => (a.id === next.id ? next : a)));
-      setSelectedAction(next);
-    }
+  const stats = useMemo(() => computeActionStats(scopedActions), [scopedActions]);
+  const currentPhase = phases.find((p) => p.id === activePhase)!;
+
+  const goList = () => {
     setPageMode('list');
-    setForm(emptyActionForm);
+    setSelectedAction(null);
+    setSelectedStrategy(null);
+    setSelectedPhaseId(null);
+    setPhaseForm(null);
+  };
+
+  const openCreate = () => {
+    setForm(emptyActionForm());
+    setSelectedAction(null);
+    setPageMode('create');
+  };
+
+  const openView = (action: MarketingAction) => {
+    setSelectedAction(action);
+    setPageMode('view');
+  };
+
+  const openEdit = (action: MarketingAction) => {
+    setSelectedAction(action);
+    setForm(actionToFormValues(action));
+    setPageMode('edit');
+  };
+
+  const openStrategyView = (pillar: StrategyPillar) => {
+    setSelectedStrategy(pillar);
+    setPageMode('strategy-view');
+  };
+
+  const openPhaseView = (phase: MarketingPhase) => {
+    setSelectedPhaseId(phase);
+    setActivePhase(phase);
+    setPageMode('phase-view');
+  };
+
+  const openPhaseEdit = (phaseId: MarketingPhase) => {
+    const phase = phases.find((p) => p.id === phaseId);
+    if (!phase) return;
+    setSelectedPhaseId(phaseId);
+    setActivePhase(phaseId);
+    setPhaseForm(phaseToFormValues(phase));
+    setPageMode('phase-edit');
+  };
+
+  const handleActionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pageMode === 'create') {
+      const next = buildActionFromForm(form, undefined, projectId);
+      setActions((prev) => [next, ...prev]);
+      setSelectedAction(next);
+      setPageMode('view');
+    } else if (pageMode === 'edit' && selectedAction) {
+      const next = buildActionFromForm(form, selectedAction, projectId);
+      setActions((prev) => prev.map((item) => (item.id === next.id ? next : item)));
+      setSelectedAction(next);
+      setPageMode('view');
+    }
+    setForm(emptyActionForm());
+  };
+
+  const handlePhaseSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phaseForm || !selectedPhaseId) return;
+    const base = phases.find((p) => p.id === selectedPhaseId);
+    if (!base) return;
+    const next = applyPhaseTheme(buildPhaseFromForm(phaseForm, base));
+    setPhases((prev) => prev.map((p) => (p.id === next.id ? next : p)));
+    setPhaseForm(null);
+    setPageMode('phase-view');
   };
 
   const removeAction = (id: string) => {
     setActions((prev) => prev.filter((a) => a.id !== id));
-    setSelectedAction(null);
-    setPageMode('list');
+    goList();
   };
 
-  const openCreateAction = () => { setForm(emptyActionForm); setSelectedAction(null); setPageMode('create'); };
-  const openViewAction = (a: MarketingAction) => { setSelectedAction(a); setPageMode('view'); };
-  const openEditAction = (a: MarketingAction) => {
-    setSelectedAction(a);
-    setForm({ title: a.title, phase: a.phase, channel: a.channel, status: a.status, description: a.description });
-    setPageMode('edit');
-  };
-
-  const actionFormPage = (
-    <ViewShell narrow>
-      <PageBackHeader title={pageMode === 'create' ? 'Nouvelle action marketing' : 'Modifier l\'action'} onBack={() => setPageMode(selectedAction ? 'view' : 'list')} />
-      <form onSubmit={submitActionForm} className="bg-white rounded-xl border p-6 space-y-4">
-        <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Titre de l'action" className="w-full px-4 py-2 border rounded-lg" />
-        <select value={form.phase} onChange={(e) => setForm({ ...form, phase: e.target.value as MarketingPhase })} className="w-full px-4 py-2 border rounded-lg">
-          <option value="year1">Année 1</option><option value="year2">Année 2</option><option value="year3">Année 3</option><option value="year4-5">Années 4-5</option>
-        </select>
-        <input value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value })} placeholder="Canal" className="w-full px-4 py-2 border rounded-lg" />
-        <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as MarketingAction['status'] })} className="w-full px-4 py-2 border rounded-lg">
-          <option value="planned">Planifiée</option><option value="in-progress">En cours</option><option value="done">Terminée</option>
-        </select>
-        <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Description" rows={3} className="w-full px-4 py-2 border rounded-lg" />
-        <div className="flex gap-3">
-          <button type="button" onClick={() => setPageMode(selectedAction ? 'view' : 'list')} className="flex-1 px-4 py-2 border rounded-lg">Annuler</button>
-          <button type="submit" className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg">{pageMode === 'create' ? 'Créer' : 'Enregistrer'}</button>
-        </div>
-      </form>
-    </ViewShell>
-  );
-
-  if (pageMode === 'create' || pageMode === 'edit') return actionFormPage;
-
-  if (pageMode === 'view' && selectedAction) {
-    const a = scopedActions.find((x) => x.id === selectedAction.id) ?? selectedAction;
+  if (!ready) {
     return (
-      <ViewShell narrow>
-        <PageBackHeader title={a.title} subtitle={a.channel} onBack={() => { setPageMode('list'); setSelectedAction(null); }}
-          actions={<div className="flex gap-2">
-            <button type="button" onClick={() => openEditAction(a)} className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg"><Pencil className="w-4 h-4" /> Modifier</button>
-            <button type="button" onClick={() => removeAction(a.id)} className="inline-flex items-center gap-2 px-4 py-2 border border-red-200 text-red-700 rounded-lg"><Trash2 className="w-4 h-4" /> Supprimer</button>
-          </div>}
-        />
-        <div className="bg-white rounded-xl border p-6 space-y-2 text-sm">
-          <p><span className="text-gray-500">Phase :</span> {a.phase}</p>
-          <p><span className="text-gray-500">Statut :</span> {a.status}</p>
-          <p className="text-gray-700">{a.description}</p>
+      <ViewShell>
+        <div className="flex flex-col items-center justify-center py-24 gap-3">
+          <div className="h-8 w-8 rounded-full border-2 border-violet-200 border-t-violet-600 animate-spin" />
+          <p className="text-sm text-stone-500">Chargement de la stratégie marketing…</p>
         </div>
       </ViewShell>
     );
   }
 
-  const roadmapPhases: RoadmapPhase[] = [
-    {
-      id: 'year1',
-      year: 'Année 1',
-      label: 'Conception & Prototype',
-      volume: '1 unité',
-      unitCost: '750–850 €',
-      color: 'yellow',
-      objectives: [
-        'Créer un robot full premium',
-        'Valider la faisabilité technique à 90%',
-        'Crédibiliser le projet auprès des financeurs',
-      ],
-      marketing: [
-        'Storytelling R&D authentique',
-        'Communication "coulisses" du développement',
-        'Preuves techniques et démonstrations',
-        'Création des premiers contenus vidéo',
-      ],
-      risks: ['Dépassement budget prototype', 'Complexité technique sous-estimée'],
-      linkedTasks: ['task-proto-v1', 'task-tests-initial'],
-    },
-    {
-      id: 'year2',
-      year: 'Année 2',
-      label: 'Pré-série artisanale',
-      volume: '5–10 unités',
-      unitCost: '550–600 €',
-      color: 'orange',
-      objectives: [
-        'Recueillir retours parents et enfants',
-        'Créer des démonstrateurs fonctionnels',
-        'Obtenir premières certifications (CE)',
-      ],
-      marketing: [
-        'Programme ambassadeurs (early adopters)',
-        'Tests terrain filmés et documentés',
-        'Communication pédagogique (bénéfices éducatifs)',
-        'Partenariats écoles pilotes',
-      ],
-      risks: ['Retours utilisateurs négatifs', 'Délais certification'],
-      linkedTasks: ['task-pre-serie', 'task-certification'],
-    },
-    {
-      id: 'year3',
-      year: 'Année 3',
-      label: 'Pré-série semi-industrielle',
-      volume: '200–5 000 unités',
-      unitCost: '240–290 €',
-      sellingPrice: '699–899 €',
-      margin: '+450–560 €',
-      color: 'blue',
-      objectives: [
-        'Industrialiser la production',
-        'Atteindre rentabilité opérationnelle',
-        'Établir présence marché éducatif',
-      ],
-      marketing: [
-        'Partenariats écoles et institutions',
-        'Presse spécialisée (EdTech, robotique)',
-        'Campagne crowdfunding (validation marché)',
-        'Salons éducatifs et tech',
-      ],
-      risks: ['Qualité industrialisation', 'Concurrence émergente'],
-      linkedTasks: ['task-industrialisation', 'task-crowdfunding'],
-    },
-    {
-      id: 'year4-5',
-      year: 'Années 4-5',
-      label: 'Grande série & Internationalisation',
-      volume: '5 000 → 50 000 unités',
-      unitCost: '150–200 €',
-      sellingPrice: '499–699 €',
-      margin: '+350–500 €',
-      color: 'green',
-      objectives: [
-        'Économies d\'échelle maximales',
-        'Optimisation complète supply chain',
-        'Expansion internationale',
-        'Marque reconnue dans l\'éducation',
-      ],
-      marketing: [
-        'Image de marque établie',
-        'Communication institutionnelle',
-        'Expansion européenne puis mondiale',
-        'Partenariats majeurs (Microsoft Education, Google for Education)',
-      ],
-      risks: ['Saturation marché local', 'Barrières réglementaires export'],
-    },
-  ];
+  if (pageMode === 'create' || pageMode === 'edit') {
+    return (
+      <MarketingActionFormPage
+        mode={pageMode === 'create' ? 'create' : 'edit'}
+        values={form}
+        phases={phases}
+        onChange={setForm}
+        onBack={() => {
+          if (selectedAction && pageMode === 'edit') setPageMode('view');
+          else goList();
+        }}
+        onSubmit={handleActionSubmit}
+      />
+    );
+  }
 
-  const strategies = [
-    {
-      id: 'entry',
-      title: 'Stratégie d\'entrée',
-      subtitle: 'High-End Entry Strategy',
-      icon: Award,
-      color: 'purple',
-      principle: 'Entrer par le premium pour rendre l\'excellence accessible',
-      description:
-        'Lancement avec un prototype premium techniquement avancé pour démontrer la faisabilité et crédibiliser le projet',
-      advantages: [
-        'Forte différenciation vs concurrence',
-        'Attractivité pour financeurs et incubateurs',
-        'Réduction du risque technique long terme',
-        'Base technologique solide pour industrialisation',
-      ],
-      isoLink: '§5.1.2 — Orientation client',
-    },
-    {
-      id: 'pricing',
-      title: 'Stratégie de prix',
-      subtitle: 'Skimming Pricing Strategy',
-      icon: DollarSign,
-      color: 'green',
-      principle: 'Le prix suit la maturité industrielle, pas l\'inverse',
-      description:
-        'Prix initial élevé justifié par R&D et faible volume, puis baisse progressive grâce aux économies d\'échelle',
-      advantages: [
-        'Financement de la R&D par early adopters',
-        'Valorisation de l\'innovation',
-        'Baisse progressive = accessibilité croissante',
-        'Marges élevées pour réinvestissement',
-      ],
-      isoLink: '§7.1.3 — Ressources financières',
-    },
-    {
-      id: 'manufacturing',
-      title: 'Stratégie de coûts',
-      subtitle: 'Lean Manufacturing & Automation',
-      icon: Zap,
-      color: 'orange',
-      principle: 'Moins de variabilité = plus de qualité = moins de SAV',
-      description:
-        'Standardisation des composants, automatisation des process, réduction continue des coûts unitaires',
-      advantages: [
-        'Réduction des coûts de 70% (850€ → 250€)',
-        'Amélioration continue de la qualité',
-        'Fiabilité accrue du produit',
-        'Scalabilité industrielle',
-      ],
-      isoLink: '§8.5 — Production et service',
-    },
-    {
-      id: 'growth',
-      title: 'Stratégie de croissance',
-      subtitle: 'Economies of Scale',
-      icon: TrendingUp,
-      color: 'blue',
-      principle: 'Plus on produit, moins ça coûte, mieux c\'est fabriqué',
-      description:
-        'Chaque palier de volume (x10) débloque des optimisations industrielles significatives',
-      advantages: [
-        'x10 unités → négociation fournisseurs',
-        'x100 unités → injection plastique rentable',
-        'x1000 unités → PCB custom + tests auto',
-        'x10000 unités → optimisation logistique complète',
-      ],
-      isoLink: '§7.1 — Ressources',
-    },
-    {
-      id: 'learning',
-      title: 'Stratégie d\'apprentissage',
-      subtitle: 'Learning Curve Effect',
-      icon: BarChart3,
-      color: 'indigo',
-      principle: 'Chaque robot produit améliore le suivant',
-      description:
-        'Capitalisation des apprentissages à chaque itération pour optimiser design, process et coûts',
-      advantages: [
-        'Réduction temps d\'assemblage (-40% en 1 an)',
-        'Simplification architecture produit',
-        'Suppression composants redondants',
-        'Optimisation IA / énergie / mécanique',
-      ],
-      isoLink: '§7.1.6 — Connaissances organisationnelles',
-    },
-  ];
+  if (pageMode === 'phase-edit' && phaseForm && selectedPhaseId) {
+    const phase = phases.find((p) => p.id === selectedPhaseId)!;
+    return (
+      <MarketingPhaseFormPage
+        phaseYear={phase.year}
+        values={phaseForm}
+        onChange={setPhaseForm}
+        onBack={() => {
+          if (selectedPhaseId) setPageMode('phase-view');
+          else goList();
+        }}
+        onSubmit={handlePhaseSubmit}
+      />
+    );
+  }
 
-  const digitalChannels = [
-    {
-      name: 'Instagram',
-      icon: Instagram,
-      color: 'pink',
-      target: 'Parents jeunes, éducateurs',
-      content: 'Coulisses, design, tests enfants, valeurs',
-      frequency: '3-4 posts/semaine',
-      priority: 'high',
-    },
-    {
-      name: 'TikTok',
-      icon: Video,
-      color: 'purple',
-      target: 'Grand public, viral',
-      content: 'Démonstrations, réactions enfants, pédagogie ludique',
-      frequency: '5-7 vidéos/semaine',
-      priority: 'high',
-    },
-    {
-      name: 'Facebook',
-      icon: Facebook,
-      color: 'blue',
-      target: 'Parents, enseignants, institutions',
-      content: 'Articles de fond, témoignages, événements',
-      frequency: '2-3 posts/semaine',
-      priority: 'medium',
-    },
-    {
-      name: 'LinkedIn',
-      icon: Linkedin,
-      color: 'indigo',
-      target: 'Incubateurs, financeurs, B2B',
-      content: 'Actualités projet, levées de fonds, partenariats',
-      frequency: '1-2 posts/semaine',
-      priority: 'low',
-    },
-  ];
+  if (pageMode === 'view' && selectedAction) {
+    const action = scopedActions.find((a) => a.id === selectedAction.id) ?? selectedAction;
+    return (
+      <MarketingActionDetailPage
+        action={action}
+        phases={phases}
+        onBack={goList}
+        onEdit={() => openEdit(action)}
+        onDelete={() => removeAction(action.id)}
+      />
+    );
+  }
 
-  const kpis = [
-    {
-      label: 'Coût unitaire cible (An 3)',
-      value: '240–290 €',
-      trend: 'down',
-      color: 'green',
-      evolution: '-65% vs An 1',
-    },
-    {
-      label: 'Prix de vente cible (An 3)',
-      value: '699–899 €',
-      trend: 'neutral',
-      color: 'blue',
-      evolution: 'Positionnement premium',
-    },
-    {
-      label: 'Marge brute cible (An 3)',
-      value: '+450–560 €',
-      trend: 'up',
-      color: 'purple',
-      evolution: '+60-65%',
-    },
-    {
-      label: 'Volume cible (An 3)',
-      value: '200–5 000 unités',
-      trend: 'up',
-      color: 'orange',
-      evolution: 'x20-500 vs An 2',
-    },
-  ];
+  if (pageMode === 'strategy-view' && selectedStrategy) {
+    return <MarketingStrategyDetailPage pillar={selectedStrategy} onBack={goList} />;
+  }
 
-  const currentPhase = roadmapPhases.find((p) => p.id === activePhase);
+  if (pageMode === 'phase-view' && selectedPhaseId) {
+    const phase = phases.find((p) => p.id === selectedPhaseId)!;
+    return (
+      <MarketingPhaseDetailPage
+        phase={phase}
+        onBack={goList}
+        onEdit={() => openPhaseEdit(selectedPhaseId)}
+      />
+    );
+  }
 
   return (
     <ViewShell>
       <ViewHeader
-        title="Stratégie Marketing & Communication"
-        subtitle="Positionnement premium, pricing skimming et industrialisation progressive"
-        badge="Marketing · POPY"
+        title="Stratégie marketing"
+        subtitle={
+          activeProject
+            ? `${activeProject.name} — Roadmap 5 ans`
+            : 'Choisissez un projet dans le menu en haut'
+        }
+        badge="Marketing · ISO §5.1"
+        badgeIcon={Sparkles}
         theme="violet"
+        sidePanel={
+          activeProject ? (
+            <div className="space-y-3 text-sm">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide font-semibold text-violet-700">Projet actif</p>
+                <p className="font-semibold text-stone-900 mt-0.5">{activeProject.name}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide font-semibold text-stone-500">Phase roadmap</p>
+                <p className="font-medium text-stone-800 mt-0.5">{currentPhase.year}</p>
+                <p className="text-stone-600 text-xs">{currentPhase.label}</p>
+              </div>
+              <div className="pt-2 border-t border-violet-100">
+                <p className="text-[11px] uppercase tracking-wide font-semibold text-stone-500">Actions</p>
+                <p className="text-2xl font-bold text-violet-700 mt-0.5">{stats.total}</p>
+                <p className="text-xs text-stone-500">{stats.inProgress} en cours · {stats.planned} planifiées</p>
+              </div>
+            </div>
+          ) : undefined
+        }
         actions={
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <ActionButton variant="secondary" icon={Download}>Export stratégie</ActionButton>
-            <ActionButton icon={Plus} onClick={openCreateAction} className="!bg-purple-600 hover:!bg-purple-700 !text-white">Ajouter action</ActionButton>
+            <ActionButton icon={Plus} onClick={openCreate} className="w-full sm:w-auto justify-center">
+              Nouvelle action
+            </ActionButton>
           </div>
         }
       />
 
-      {/* KPIs Marketing */}
-      <div className={viewGrids.stats4}>
-        {kpis.map((kpi, index) => (
-          <div
-            key={index}
-            className={`bg-gradient-to-br from-${kpi.color}-500 to-${kpi.color}-600 rounded-xl p-6 text-white`}
-          >
-            <div className="text-sm font-medium mb-2">{kpi.label}</div>
-            <div className="text-3xl font-bold mb-2">{kpi.value}</div>
-            <div className="flex items-center gap-2 text-sm opacity-90">
-              {kpi.trend === 'up' && <TrendingUp className="w-4 h-4" />}
-              {kpi.trend === 'down' && <TrendingDown className="w-4 h-4" />}
-              <span>{kpi.evolution}</span>
-            </div>
-          </div>
-        ))}
-      </div>
+      <ViewStatsGrid cols={2} className="sm:hidden">
+        <ViewStatCard label="Actions" value={String(stats.total)} gradient="from-violet-500 to-purple-600" icon={Megaphone} />
+        <ViewStatCard label="En cours" value={String(stats.inProgress)} gradient="from-fuchsia-500 to-pink-600" icon={TrendingUp} />
+      </ViewStatsGrid>
 
-      {/* Actions marketing (CRUD) */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Actions marketing planifiées</h2>
-          <button type="button" onClick={openCreateAction} className="text-sm text-purple-600 hover:text-purple-700 font-medium inline-flex items-center gap-1"><Plus className="w-4 h-4" /> Nouvelle action</button>
-        </div>
-        <div className="space-y-2">
-          {scopedActions.map((action) => (
-            <div key={action.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-              <div>
-                <div className="font-medium text-gray-900">{action.title}</div>
-                <div className="text-sm text-gray-600">{action.channel} • {action.phase} • {action.status}</div>
-              </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => openViewAction(action)} className="p-2 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4" /></button>
-                <button type="button" onClick={() => openEditAction(action)} className="p-2 hover:bg-gray-100 rounded-lg"><Pencil className="w-4 h-4" /></button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <ViewStatsGrid cols={4} className="hidden sm:grid">
+        <ViewStatCard label="Actions totales" value={String(stats.total)} gradient="from-violet-500 to-purple-600" icon={Megaphone} />
+        <ViewStatCard label="En cours" value={String(stats.inProgress)} gradient="from-fuchsia-500 to-pink-600" icon={TrendingUp} />
+        <ViewStatCard label="Planifiées" value={String(stats.planned)} gradient="from-stone-400 to-stone-600" icon={Target} />
+        <ViewStatCard label="Coût cible An 3" value="265 €" hint="-69% vs An 1" gradient="from-emerald-500 to-teal-600" icon={Map} />
+      </ViewStatsGrid>
 
-      {/* Positionnement stratégique */}
-      <div className="bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl p-8 text-white">
-        <div className="flex items-center gap-3 mb-4">
-          <Target className="w-8 h-8" />
-          <h2 className="text-2xl font-bold">Positionnement stratégique POPY</h2>
-        </div>
-        <p className="text-xl mb-6 font-medium">
-          "Entrer par le premium pour rendre l'excellence accessible"
-        </p>
-        <div className={viewGrids.stats5}>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center">
-            <TrendingUp className="w-6 h-6 mx-auto mb-1" />
-            <div className="text-sm font-medium">Premium au départ</div>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center">
-            <Settings className="w-6 h-6 mx-auto mb-1" />
-            <div className="text-sm font-medium">Industriel dans l'ADN</div>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center">
-            <TrendingDown className="w-6 h-6 mx-auto mb-1" />
-            <div className="text-sm font-medium">Coûts décroissants</div>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center">
-            <TrendingUp className="w-6 h-6 mx-auto mb-1" />
-            <div className="text-sm font-medium">Qualité croissante</div>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center">
-            <Heart className="w-6 h-6 mx-auto mb-1" />
-            <div className="text-sm font-medium">Humain & pédagogique</div>
-          </div>
-        </div>
-      </div>
+      <MarketingTabNav activeTab={activeTab} onChange={setActiveTab} stats={stats} />
 
-      {/* 5 Stratégies clés */}
-      <div className="space-y-4">
-        <h2 className="text-2xl font-bold text-gray-900">5 Piliers stratégiques</h2>
-        {strategies.map((strategy) => {
-          const Icon = strategy.icon;
-          return (
-            <div key={strategy.id} className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-start gap-4">
-                <div
-                  className={`w-14 h-14 rounded-xl bg-${strategy.color}-100 flex items-center justify-center flex-shrink-0`}
-                >
-                  <Icon className={`w-7 h-7 text-${strategy.color}-600`} />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900">{strategy.title}</h3>
-                      <p className="text-sm text-gray-600">{strategy.subtitle}</p>
-                    </div>
-                    <span className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full font-medium">
-                      {strategy.isoLink}
-                    </span>
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                    <p className="text-blue-900 font-medium italic">"{strategy.principle}"</p>
-                  </div>
-
-                  <p className="text-gray-700 mb-4">{strategy.description}</p>
-
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-900 mb-2">Avantages clés</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {strategy.advantages.map((advantage, idx) => (
-                        <div key={idx} className="flex items-start gap-2">
-                          <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
-                          <span className="text-sm text-gray-700">{advantage}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Roadmap 5 ans */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">
-          Feuille de route Marketing & Produit (5 ans)
-        </h2>
-
-        {/* Timeline navigation */}
-        <div className="flex gap-3 mb-6">
-          {roadmapPhases.map((phase) => (
-            <button
-              key={phase.id}
-              onClick={() => setActivePhase(phase.id)}
-              className={`flex-1 p-4 rounded-lg border-2 transition-all ${
-                activePhase === phase.id
-                  ? `border-${phase.color}-500 bg-${phase.color}-50`
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <div className="font-semibold text-gray-900 mb-1">{phase.year}</div>
-              <div className="text-sm text-gray-600">{phase.label}</div>
-              <div className="text-xs text-gray-500 mt-1">{phase.volume}</div>
-            </button>
-          ))}
-        </div>
-
-        {/* Phase détaillée */}
-        {currentPhase && (
-          <div className="space-y-6">
-            <div className={viewGrids.stats4}>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="text-sm text-gray-600 mb-1">Volume de production</div>
-                <div className="text-xl font-bold text-gray-900">{currentPhase.volume}</div>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="text-sm text-gray-600 mb-1">Coût unitaire</div>
-                <div className="text-xl font-bold text-gray-900">{currentPhase.unitCost}</div>
-              </div>
-              {currentPhase.sellingPrice && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 mb-1">Prix de vente</div>
-                  <div className="text-xl font-bold text-gray-900">
-                    {currentPhase.sellingPrice}
-                  </div>
-                </div>
-              )}
-              {currentPhase.margin && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 mb-1">Marge brute</div>
-                  <div className="text-xl font-bold text-green-600">{currentPhase.margin}</div>
-                </div>
-              )}
-            </div>
-
-            <div className={viewGrids.stats3}>
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Target className="w-5 h-5 text-blue-600" />
-                  Objectifs
-                </h4>
-                <ul className="space-y-2">
-                  {currentPhase.objectives.map((obj, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm text-gray-700">{obj}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-purple-600" />
-                  Actions Marketing
-                </h4>
-                <ul className="space-y-2">
-                  {currentPhase.marketing.map((action, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <ArrowRight className="w-4 h-4 text-purple-600 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm text-gray-700">{action}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-orange-600" />
-                  Risques associés
-                </h4>
-                <ul className="space-y-2">
-                  {currentPhase.risks.map((risk, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <div className="w-2 h-2 rounded-full bg-orange-600" />
-                      </div>
-                      <span className="text-sm text-gray-700">{risk}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            {currentPhase.linkedTasks && currentPhase.linkedTasks.length > 0 && (
-              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-indigo-900 mb-2">
-                  <LinkIcon className="w-4 h-4" />
-                  Tâches liées dans POPILOT
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {currentPhase.linkedTasks.map((taskId) => (
-                    <span
-                      key={taskId}
-                      className="px-3 py-1 bg-white text-indigo-700 rounded text-xs font-medium"
-                    >
-                      {taskId}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+      <div className="rounded-xl sm:rounded-2xl border border-stone-200/90 bg-white p-3 sm:p-4 md:p-6 shadow-sm min-w-0 overflow-hidden">
+        {activeTab === 'overview' && (
+          <MarketingOverviewTab
+            phases={phases}
+            actions={scopedActions}
+            activePhase={activePhase}
+            onPhaseChange={setActivePhase}
+            onViewPhase={openPhaseView}
+            onEditPhase={openPhaseEdit}
+            onViewAction={openView}
+            onCreateAction={openCreate}
+            onGoDigital={() => setActiveTab('digital')}
+            onGoPillars={() => setActiveTab('pillars')}
+            onGoRoadmap={() => setActiveTab('roadmap')}
+          />
         )}
-      </div>
 
-      {/* Communication digitale */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Stratégie Communication Digitale</h2>
-            <p className="text-gray-600 mt-1">
-              Créer une communauté engagée et faire vivre le projet publiquement
-            </p>
-          </div>
-          <Smartphone className="w-8 h-8 text-purple-600" />
-        </div>
+        {activeTab === 'actions' && (
+          <MarketingActionsTab
+            phases={phases}
+            actions={filteredActions}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            filterPhase={filterPhase}
+            onFilterPhaseChange={setFilterPhase}
+            filterStatus={filterStatus}
+            onFilterStatusChange={setFilterStatus}
+            onCreate={openCreate}
+            onView={openView}
+            onEdit={openEdit}
+          />
+        )}
 
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
-          <p className="text-purple-900 font-medium flex items-center gap-2">
-            <Megaphone className="w-5 h-5 shrink-0" />
-            Communication authentique, pas publicitaire — Montrer les coulisses, les défis, les
-            apprentissages
-          </p>
-        </div>
+        {activeTab === 'roadmap' && (
+          <MarketingRoadmapTab
+            phases={phases}
+            actions={scopedActions}
+            activePhase={activePhase}
+            onPhaseChange={setActivePhase}
+            onViewPhase={openPhaseView}
+            onEditPhase={openPhaseEdit}
+          />
+        )}
 
-        <div className="grid grid-cols-2 gap-4">
-          {digitalChannels.map((channel) => {
-            const Icon = channel.icon;
-            return (
-              <div
-                key={channel.name}
-                className={`border-2 rounded-xl p-5 ${
-                  channel.priority === 'high'
-                    ? `border-${channel.color}-400 bg-${channel.color}-50`
-                    : 'border-gray-200'
-                }`}
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <div
-                    className={`w-12 h-12 rounded-xl bg-${channel.color}-100 flex items-center justify-center`}
-                  >
-                    <Icon className={`w-6 h-6 text-${channel.color}-600`} />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{channel.name}</h3>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${
-                        channel.priority === 'high'
-                          ? 'bg-red-100 text-red-700'
-                          : channel.priority === 'medium'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {channel.priority === 'high'
-                        ? 'Prioritaire'
-                        : channel.priority === 'medium'
-                        ? 'Moyen'
-                        : 'Optionnel'}
-                    </span>
-                  </div>
-                </div>
+        {activeTab === 'pillars' && <MarketingStrategiesTab onViewStrategy={openStrategyView} />}
 
-                <div className="space-y-2 text-sm">
-                  <div>
-                    <span className="font-medium text-gray-700">Cible :</span>{' '}
-                    <span className="text-gray-600">{channel.target}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Contenu :</span>{' '}
-                    <span className="text-gray-600">{channel.content}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Fréquence :</span>{' '}
-                    <span className="text-gray-600">{channel.frequency}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {activeTab === 'digital' && (
+          <MarketingChannelsTab activeChannelId={activeChannelId} onChannelChange={setActiveChannelId} />
+        )}
 
-        <div className={`mt-6 ${viewGrids.stats4}`}>
-          <div className="bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg p-4 text-white">
-            <div className="text-sm font-medium mb-1">Contenus créés</div>
-            <div className="text-2xl font-bold">12</div>
-            <div className="text-xs mt-1 opacity-90">Ce mois-ci</div>
-          </div>
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-4 text-white">
-            <div className="text-sm font-medium mb-1">Engagement</div>
-            <div className="text-2xl font-bold">245</div>
-            <div className="text-xs mt-1 opacity-90">Interactions/post</div>
-          </div>
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-4 text-white">
-            <div className="text-sm font-medium mb-1">Abonnés</div>
-            <div className="text-2xl font-bold">1 234</div>
-            <div className="text-xs mt-1 opacity-90">+12% ce mois</div>
-          </div>
-          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-4 text-white">
-            <div className="text-sm font-medium mb-1">Portée</div>
-            <div className="text-2xl font-bold">8 456</div>
-            <div className="text-xs mt-1 opacity-90">Personnes touchées</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Graphique évolution coûts */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          Évolution Coût unitaire vs Prix de vente
-        </h2>
-        <div className="h-64 flex items-end justify-between gap-2">
-          <div className="flex-1 flex flex-col items-center">
-            <div className="w-full bg-gradient-to-t from-red-500 to-red-400 rounded-t-lg relative" style={{ height: '85%' }}>
-              <div className="absolute -top-6 left-0 right-0 text-center font-bold text-gray-900">
-                850 €
-              </div>
-            </div>
-            <div className="text-sm font-medium text-gray-600 mt-2">An 1</div>
-            <div className="text-xs text-gray-500">1 unité</div>
-          </div>
-
-          <div className="flex-1 flex flex-col items-center">
-            <div className="w-full bg-gradient-to-t from-orange-500 to-orange-400 rounded-t-lg relative" style={{ height: '65%' }}>
-              <div className="absolute -top-6 left-0 right-0 text-center font-bold text-gray-900">
-                575 €
-              </div>
-            </div>
-            <div className="text-sm font-medium text-gray-600 mt-2">An 2</div>
-            <div className="text-xs text-gray-500">5-10 unités</div>
-          </div>
-
-          <div className="flex-1 flex flex-col items-center relative">
-            <div className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-lg relative" style={{ height: '30%' }}>
-              <div className="absolute -top-6 left-0 right-0 text-center font-bold text-gray-900">
-                265 €
-              </div>
-            </div>
-            <div className="w-full border-2 border-green-500 border-dashed rounded-t-lg absolute bottom-16" style={{ height: '75%' }}>
-              <div className="absolute -top-8 left-0 right-0 text-center font-bold text-green-600">
-                799 €
-              </div>
-            </div>
-            <div className="text-sm font-medium text-gray-600 mt-2">An 3</div>
-            <div className="text-xs text-gray-500">200-5K unités</div>
-          </div>
-
-          <div className="flex-1 flex flex-col items-center relative">
-            <div className="w-full bg-gradient-to-t from-green-500 to-green-400 rounded-t-lg relative" style={{ height: '18%' }}>
-              <div className="absolute -top-6 left-0 right-0 text-center font-bold text-gray-900">
-                175 €
-              </div>
-            </div>
-            <div className="w-full border-2 border-green-500 border-dashed rounded-t-lg absolute bottom-16" style={{ height: '60%' }}>
-              <div className="absolute -top-8 left-0 right-0 text-center font-bold text-green-600">
-                599 €
-              </div>
-            </div>
-            <div className="text-sm font-medium text-gray-600 mt-2">An 4-5</div>
-            <div className="text-xs text-gray-500">5-50K unités</div>
-          </div>
-        </div>
-        <div className="flex justify-center gap-6 mt-6">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-gradient-to-t from-blue-500 to-blue-400 rounded" />
-            <span className="text-sm text-gray-600">Coût unitaire</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 border-2 border-green-500 border-dashed rounded" />
-            <span className="text-sm text-gray-600">Prix de vente</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Connexions avec autres modules */}
-      <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <LinkIcon className="w-6 h-6 text-indigo-600" />
-          <h3 className="text-xl font-semibold text-gray-900">Connexions avec POPILOT</h3>
-        </div>
-        <div className={viewGrids.stats4}>
-          <button className="bg-white rounded-lg p-4 text-left hover:shadow-md transition-shadow">
-            <div className="text-sm font-medium text-gray-600 mb-1">Budget & BOM</div>
-            <div className="text-2xl font-bold text-indigo-600">12</div>
-            <div className="text-xs text-gray-500 mt-1">Composants trackés</div>
-          </button>
-          <button className="bg-white rounded-lg p-4 text-left hover:shadow-md transition-shadow">
-            <div className="text-sm font-medium text-gray-600 mb-1">Risques</div>
-            <div className="text-2xl font-bold text-orange-600">8</div>
-            <div className="text-xs text-gray-500 mt-1">Risques identifiés</div>
-          </button>
-          <button className="bg-white rounded-lg p-4 text-left hover:shadow-md transition-shadow">
-            <div className="text-sm font-medium text-gray-600 mb-1">Tâches</div>
-            <div className="text-2xl font-bold text-blue-600">24</div>
-            <div className="text-xs text-gray-500 mt-1">Actions marketing</div>
-          </button>
-          <button className="bg-white rounded-lg p-4 text-left hover:shadow-md transition-shadow">
-            <div className="text-sm font-medium text-gray-600 mb-1">Documentation</div>
-            <div className="text-2xl font-bold text-purple-600">6</div>
-            <div className="text-xs text-gray-500 mt-1">Docs stratégiques</div>
-          </button>
-        </div>
+        {activeTab === 'indicators' && <MarketingCharts actions={scopedActions} />}
       </div>
     </ViewShell>
   );

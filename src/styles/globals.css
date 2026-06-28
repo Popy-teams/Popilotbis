@@ -316,6 +316,13 @@
     }
   }
 
+  @media (max-width: 639px) {
+    .filter-toolbar > .form-select-wrap,
+    .filter-toolbar > select:not(.form-select) {
+      width: 100%;
+    }
+  }
+
   /* Champ recherche avec icône */
   .search-field-wrap {
     position: relative;
@@ -391,20 +398,22 @@
   /* Layout page — aligné à gauche (pas de centrage mx-auto) */
   .view-shell {
     width: 100%;
-    max-width: 100rem;
+    max-width: 100%;
     margin: 0;
-    padding: 1rem 1.25rem;
+    padding: 0.75rem 0.875rem;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 1rem;
     min-width: 0;
     box-sizing: border-box;
+    overflow-x: hidden;
   }
 
   @media (min-width: 640px) {
     .view-shell {
       padding: 1.25rem 1.5rem;
       gap: 1.5rem;
+      max-width: 100rem;
     }
   }
 

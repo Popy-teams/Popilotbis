@@ -36,6 +36,7 @@ interface ProjectContextValue {
   matchesProject: (entityProjectRef?: string) => boolean;
   canUserSeeProject: (project: Project) => boolean;
   activeProjectSlug: string | null;
+  ready: boolean;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
@@ -222,6 +223,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       matchesProject,
       canUserSeeProject: (p) => (user ? canUserSeeProject(p, user, currentMemberId) : false),
       activeProjectSlug: activeProject ? getProjectSlug(activeProject) : null,
+      ready,
     }),
     [
       projects,
@@ -235,16 +237,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       currentMemberId,
       matchesProject,
       user,
+      ready,
     ]
   );
-
-  if (!ready) {
-    return (
-      <div className="min-h-screen saas-shell flex items-center justify-center">
-        <div className="text-slate-600">Chargement des projets...</div>
-      </div>
-    );
-  }
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
 }
