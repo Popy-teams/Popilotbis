@@ -170,34 +170,34 @@ export function ViewHero({
       <div className={cn('absolute -top-24 -right-24 w-64 h-64 rounded-full blur-3xl', t.glow1)} />
       <div className={cn('absolute -bottom-32 -left-16 w-72 h-72 rounded-full blur-3xl', t.glow2)} />
 
-      <div className="relative p-6 sm:p-8 lg:p-10">
-        <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-8">
-          <div className="max-w-2xl min-w-0">
+      <div className="relative p-4 sm:p-6 lg:p-10">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 sm:gap-6 lg:gap-8">
+          <div className="max-w-2xl min-w-0 flex-1">
             {badge ? (
               <div
                 className={cn(
-                  'inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-semibold mb-4 backdrop-blur-sm shadow-sm',
+                  'inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-semibold mb-3 sm:mb-4 backdrop-blur-sm shadow-sm max-w-full',
                   t.badge
                 )}
               >
-                <BadgeIcon className={cn('w-3.5 h-3.5', t.badgeIcon)} />
-                {badge}
+                <BadgeIcon className={cn('w-3.5 h-3.5 shrink-0', t.badgeIcon)} />
+                <span className="truncate">{badge}</span>
               </div>
             ) : null}
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight text-slate-900">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight leading-tight text-slate-900 break-words">
               {title}
             </h1>
             {subtitle ? (
-              <div className="mt-3 text-slate-600 text-sm sm:text-base leading-relaxed max-w-xl">
+              <div className="mt-2 sm:mt-3 text-slate-600 text-sm sm:text-base leading-relaxed max-w-xl break-words">
                 {subtitle}
               </div>
             ) : null}
-            {actions ? <div className="mt-6 flex flex-wrap gap-2">{actions}</div> : null}
+            {actions ? <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row flex-wrap gap-2 [&>*]:w-full sm:[&>*]:w-auto">{actions}</div> : null}
           </div>
           {sidePanel ? (
             <div
               className={cn(
-                'xl:w-[min(100%,22rem)] shrink-0 rounded-2xl backdrop-blur-md p-5',
+                'w-full lg:w-[min(100%,22rem)] shrink-0 rounded-2xl backdrop-blur-md p-4 sm:p-5',
                 t.sidePanel
               )}
             >
@@ -261,27 +261,27 @@ export function ViewStatCard({
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm hover:shadow-lg transition-all duration-300 group',
+        'relative overflow-hidden rounded-xl sm:rounded-2xl border border-slate-200/80 bg-white p-3 sm:p-4 lg:p-5 shadow-sm hover:shadow-lg transition-all duration-300 group min-w-0',
         className
       )}
     >
       <div
         className={cn(
-          'absolute top-0 right-0 w-20 h-20 rounded-full blur-2xl opacity-20 bg-gradient-to-br group-hover:opacity-30 transition-opacity',
+          'absolute top-0 right-0 w-16 h-16 sm:w-20 sm:h-20 rounded-full blur-2xl opacity-20 bg-gradient-to-br group-hover:opacity-30 transition-opacity',
           gradient
         )}
       />
-      <div className="relative flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-          <p className={cn('text-3xl font-bold mt-2 bg-gradient-to-r bg-clip-text text-transparent', gradient)}>
+      <div className="relative flex items-start justify-between gap-2 sm:gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate-500 leading-tight">{label}</p>
+          <p className={cn('text-xl sm:text-2xl lg:text-3xl font-bold mt-1 sm:mt-2 bg-gradient-to-r bg-clip-text text-transparent break-words', gradient)}>
             {value}
           </p>
-          {hint ? <p className="text-xs text-slate-400 mt-1">{hint}</p> : null}
+          {hint ? <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1">{hint}</p> : null}
         </div>
         {Icon ? (
-          <div className={cn('p-2.5 rounded-xl bg-gradient-to-br text-white shadow-md shrink-0', gradient)}>
-            <Icon className="w-5 h-5" />
+          <div className={cn('p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-gradient-to-br text-white shadow-md shrink-0', gradient)}>
+            <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         ) : null}
       </div>
@@ -299,11 +299,11 @@ export function ViewStatsGrid({
   className?: string;
 }) {
   const gridClass = {
-    2: 'grid grid-cols-2 gap-4',
-    3: 'grid grid-cols-1 sm:grid-cols-3 gap-4',
-    4: 'grid grid-cols-2 lg:grid-cols-4 gap-4',
-    5: 'grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4',
-    6: 'grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4',
+    2: 'grid grid-cols-1 min-[400px]:grid-cols-2 gap-3 sm:gap-4',
+    3: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4',
+    4: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4',
+    5: 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4',
+    6: 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4',
   }[cols];
 
   return <div className={cn(gridClass, className)}>{children}</div>;
@@ -342,13 +342,15 @@ export function ViewSectionTitle({
 
 export function ViewTabPills({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div
-      className={cn(
-        'inline-flex p-1 rounded-xl bg-stone-100/90 border border-stone-200/90 gap-1 flex-wrap',
-        className
-      )}
-    >
-      {children}
+    <div className="w-full min-w-0 max-w-full">
+      <div
+        className={cn(
+          'grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap gap-1 p-1 rounded-xl bg-stone-100/90 border border-stone-200/90 w-full',
+          className
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -358,25 +360,35 @@ export function ViewTabBtn({
   onClick,
   icon: Icon,
   children,
+  mobileLabel,
 }: {
   active: boolean;
   onClick: () => void;
   icon?: LucideIcon;
   children: ReactNode;
+  /** Libellé court affiché sous lg quand la grille est serrée */
+  mobileLabel?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all',
+        'inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 lg:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all w-full lg:w-auto min-w-0',
         active
           ? 'bg-white text-stone-900 shadow-sm border border-stone-200/90'
           : 'text-stone-500 hover:text-stone-800 hover:bg-white/60'
       )}
     >
-      {Icon ? <Icon className="w-4 h-4" /> : null}
-      {children}
+      {Icon ? <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" /> : null}
+      {mobileLabel ? (
+        <>
+          <span className="lg:hidden truncate">{mobileLabel}</span>
+          <span className="hidden lg:inline">{children}</span>
+        </>
+      ) : (
+        <span className="truncate">{children}</span>
+      )}
     </button>
   );
 }
@@ -448,14 +460,14 @@ export function ViewHighlightBanner({
   const lg = lightGradients[theme];
 
   return (
-    <div className={cn('relative overflow-hidden rounded-[1.25rem] border border-slate-200/80 p-6 sm:p-8 shadow-sm bg-gradient-to-br', lg.bg)}>
+    <div className={cn('relative overflow-hidden rounded-xl sm:rounded-[1.25rem] border border-slate-200/80 p-4 sm:p-6 lg:p-8 shadow-sm bg-gradient-to-br min-w-0', lg.bg)}>
       <div className={cn('absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r', lg.bar)} />
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 relative">
-        <div>
-          <h2 className={cn('text-xl sm:text-2xl font-bold tracking-tight', lg.title)}>{title}</h2>
-          {subtitle ? <p className={cn('mt-1 text-sm', lg.sub)}>{subtitle}</p> : null}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-3 sm:mb-4 relative min-w-0">
+        <div className="min-w-0 flex-1">
+          <h2 className={cn('text-lg sm:text-xl lg:text-2xl font-bold tracking-tight break-words', lg.title)}>{title}</h2>
+          {subtitle ? <p className={cn('mt-1 text-xs sm:text-sm break-words', lg.sub)}>{subtitle}</p> : null}
         </div>
-        {value ? <div className="text-4xl sm:text-5xl font-bold shrink-0 text-slate-800">{value}</div> : null}
+        {value ? <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-800 shrink-0">{value}</div> : null}
       </div>
       {progress !== undefined ? (
         <div className="w-full bg-slate-200/60 rounded-full h-3 sm:h-4 relative">
