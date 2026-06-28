@@ -368,7 +368,7 @@ export function KPIView() {
   if (pageMode === 'view' && selectedKpi) {
     const kpi = kpis.find((k) => k.id === selectedKpi.id) ?? selectedKpi;
     return (
-      <ViewShell narrow className="bg-slate-50">
+      <ViewShell narrow>
         <PageBackHeader title={kpi.name} subtitle={kpi.category} onBack={() => { setPageMode('list'); setSelectedKpi(null); }}
           actions={<div className="flex gap-2">
             <button type="button" onClick={() => openEdit(kpi)} className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg"><Pencil className="w-4 h-4" /> Modifier</button>
@@ -453,7 +453,7 @@ export function KPIView() {
   };
 
   return (
-    <div className="h-full overflow-auto bg-slate-50">
+    <div className="h-full overflow-auto">
       <ViewShell>
         <ViewHeader
           title="Tableau de bord KPI"
@@ -470,7 +470,7 @@ export function KPIView() {
         />
 
         {!showKpis ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-slate-600">
+          <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 p-8 text-center text-stone-600">
             Aucun indicateur KPI configuré pour ce projet. Les KPI de démonstration sont liés au projet POPY.
           </div>
         ) : (

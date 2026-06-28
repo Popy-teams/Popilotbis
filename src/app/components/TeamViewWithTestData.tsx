@@ -540,7 +540,7 @@ export function TeamViewWithTestData() {
             <button
               type="button"
               onClick={() => setSelectedCategory(null)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${selectedCategory === null ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${selectedCategory === null ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600'}`}
             >
               Tous
             </button>
@@ -549,7 +549,7 @@ export function TeamViewWithTestData() {
                 key={cat}
                 type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium ${selectedCategory === cat ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium ${selectedCategory === cat ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600'}`}
               >
                 {cat}
               </button>

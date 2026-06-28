@@ -10,8 +10,8 @@
   overflow-x: auto;
   scrollbar-width: thin;
   padding: 0.35rem;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  border: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #ffffff 0%, #fafaf9 100%);
+  border: 1px solid #e7e5e4;
   border-radius: 1rem;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   -webkit-overflow-scrolling: touch;

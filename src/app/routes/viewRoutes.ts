@@ -18,6 +18,7 @@ import {
   Award,
   BarChart3,
   PartyPopper,
+  RefreshCw,
 } from 'lucide-react';
 
 export type ViewType =
@@ -38,7 +39,8 @@ export type ViewType =
   | 'marketing'
   | 'satisfaction'
   | 'audit'
-  | 'kpi';
+  | 'kpi'
+  | 'pdca';
 
 export type NavSection = 'personal' | 'management' | 'quality';
 
@@ -69,6 +71,7 @@ export const APP_ROUTES: AppRouteConfig[] = [
   { id: 'satisfaction', path: 'satisfaction', label: 'Satisfaction Client', icon: Smile, section: 'quality' },
   { id: 'audit', path: 'audit', label: 'Audit ISO 9001', icon: Award, section: 'quality' },
   { id: 'kpi', path: 'kpi', label: 'KPI & Performance', icon: BarChart3, section: 'quality' },
+  { id: 'pdca', path: 'pdca', label: 'PDCA', icon: RefreshCw, section: 'quality' },
   { id: 'documentation', path: 'documentation', label: 'Documentation', icon: BookOpen, section: 'quality' },
 ];
 

@@ -2,6 +2,7 @@
 
 export interface Risk {
   id: string;
+  projectId?: string;
   title: string;
   description: string;
   category: RiskCategory;
