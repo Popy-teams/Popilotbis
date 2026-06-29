@@ -87,3 +87,58 @@ export function severityBadgeClass(severity: Alert['severity']): string {
     ? 'bg-red-50 text-red-800 border-red-200'
     : 'bg-amber-50 text-amber-900 border-amber-200';
 }
+
+export interface HealthAssessment {
+  label: string;
+  hint: string;
+  tone: 'good' | 'watch' | 'risk';
+  bannerTheme: 'emerald' | 'amber' | 'red';
+}
+
+export function getHealthAssessment(
+  healthScore: number,
+  criticalAlerts: number,
+  warningAlerts: number
+): HealthAssessment {
+  if (criticalAlerts > 0 || healthScore < 45) {
+    return {
+      label: 'Attention requise',
+      hint:
+        criticalAlerts > 0
+          ? `${criticalAlerts} alerte(s) critique(s) à traiter en priorité.`
+          : 'La santé projet est fragile — vérifiez l’avancement et le budget.',
+      tone: 'risk',
+      bannerTheme: 'red',
+    };
+  }
+  if (warningAlerts > 0 || healthScore < 70) {
+    return {
+      label: 'À surveiller',
+      hint: 'Quelques signaux à suivre — consultez les alertes et l’échéance.',
+      tone: 'watch',
+      bannerTheme: 'amber',
+    };
+  }
+  return {
+    label: 'Projet sous contrôle',
+    hint: 'Indicateurs stables — poursuivez le pilotage habituel.',
+    tone: 'good',
+    bannerTheme: 'emerald',
+  };
+}
+
+export function getOverviewPriorityMessage(
+  stats: ProjectDashboardStats,
+  alertCount: number
+): string | null {
+  if (stats.criticalAlerts > 0) {
+    return `Traitez d’abord les ${stats.criticalAlerts} alerte(s) critique(s), puis vérifiez l’avancement du projet.`;
+  }
+  if (stats.tasksInProgress > 0 && stats.healthScore < 70) {
+    return `${stats.tasksInProgress} tâche(s) en cours — assurez-vous qu’aucun blocage ne freine la livraison.`;
+  }
+  if (alertCount === 0 && stats.projectProgress < 30) {
+    return 'Le projet démarre — définissez les prochaines étapes dans Actions rapides.';
+  }
+  return null;
+}

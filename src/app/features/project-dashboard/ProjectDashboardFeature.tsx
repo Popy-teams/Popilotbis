@@ -194,15 +194,6 @@ export function ProjectDashboardFeature() {
         }
       />
 
-      {activeTab === 'overview' ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-1">
-          <StatPill label="Santé" value={`${stats.healthScore}%`} />
-          <StatPill label="Tâches" value={String(stats.tasksInProgress)} />
-          <StatPill label="Alertes" value={String(scopedAlerts.length)} />
-          <StatPill label="Avancement" value={`${stats.projectProgress}%`} />
-        </div>
-      ) : null}
-
       <ProjectDashboardTabNav
         activeTab={activeTab}
         onChange={setActiveTab}
@@ -234,14 +225,5 @@ export function ProjectDashboardFeature() {
         ) : null}
       </div>
     </ViewShell>
-  );
-}
-
-function StatPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 px-3 py-2.5 text-center min-w-0">
-      <p className="text-lg font-bold text-indigo-900 truncate">{value}</p>
-      <p className="text-[11px] text-indigo-600 font-medium">{label}</p>
-    </div>
   );
 }
