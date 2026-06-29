@@ -82,13 +82,13 @@ export function SatisfactionView() {
   }, [responses]);
 
   const scopedSurveys = useMemo(
-    () => filterByActiveProject(surveys, matchesProject),
-    [surveys, matchesProject]
+    () => filterByActiveProject(surveys, matchesProject, activeProjectSlug ?? 'popy'),
+    [surveys, matchesProject, activeProjectSlug]
   );
 
   const scopedResponses = useMemo(
-    () => filterByActiveProject(responses, matchesProject),
-    [responses, matchesProject]
+    () => filterByActiveProject(responses, matchesProject, activeProjectSlug ?? 'popy'),
+    [responses, matchesProject, activeProjectSlug]
   );
 
   const filteredResponses = useMemo(() => {

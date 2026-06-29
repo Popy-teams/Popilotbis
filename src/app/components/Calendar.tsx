@@ -200,8 +200,8 @@ export function Calendar() {
   }, [events, pageMode]);
 
   const scopedEvents = useMemo(
-    () => filterByActiveProject(events, matchesProject),
-    [events, matchesProject]
+    () => filterByActiveProject(events, matchesProject, activeProjectSlug ?? 'popy'),
+    [events, matchesProject, activeProjectSlug]
   );
 
   const filteredEvents = useMemo(

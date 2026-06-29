@@ -14,9 +14,8 @@ test.beforeEach(async ({ page }) => {
 test.describe('Projet actif', () => {
   test('affiche le sélecteur de projet dans le header', async ({ page }) => {
     await page.goto('/mon-tableau-de-bord');
-    // Le header contient le nom du projet actif ou un sélecteur
-    const header = page.locator('header');
-    await expect(header).toBeVisible();
+    await expect(page.getByRole('banner')).toBeVisible();
+    await expect(page.getByLabel('Projet actif')).toBeVisible();
   });
 
   test('la page portfolio projets est accessible', async ({ page }) => {

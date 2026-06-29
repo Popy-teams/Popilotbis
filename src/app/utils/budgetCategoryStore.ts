@@ -89,9 +89,10 @@ export function saveBudgetCategories(categories: BOMCategoryDefinition[]): void 
 
 export function getScopedCategories(
   categories: BOMCategoryDefinition[],
-  matchesProject: (ref?: string) => boolean
+  matchesProject: (ref?: string) => boolean,
+  untaggedAs = 'popy'
 ): BOMCategoryDefinition[] {
-  const scoped = filterByActiveProject(categories, matchesProject);
+  const scoped = filterByActiveProject(categories, matchesProject, untaggedAs);
   const builtIns = DEFAULT_BOM_CATEGORIES.filter((c) => !scoped.some((s) => s.id === c.id));
   return [...builtIns, ...scoped].sort((a, b) => a.sortOrder - b.sortOrder);
 }

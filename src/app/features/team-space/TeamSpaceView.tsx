@@ -82,11 +82,11 @@ function resolveCurrentMember(
 
 export function TeamSpaceView() {
   const { user } = useAuth();
-  const { activeProject, matchesProject } = useProjectContext();
+  const { activeProject, matchesProject, activeProjectSlug } = useProjectContext();
   const [teamMembers, setTeamMembers] = useState(loadTeamMembers);
   const scopedMembers = useMemo(
-    () => getScopedTeamMembers(matchesProject),
-    [teamMembers, matchesProject]
+    () => getScopedTeamMembers(matchesProject, activeProjectSlug ?? 'popy'),
+    [teamMembers, matchesProject, activeProjectSlug]
   );
   const member = useMemo(
     () => resolveCurrentMember(user?.name ?? '', user?.email ?? '', scopedMembers),

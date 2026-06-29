@@ -49,8 +49,8 @@ export function Dashboard() {
   }, [alerts]);
 
   const scopedAlerts = useMemo(
-    () => filterByActiveProject(alerts, matchesProject),
-    [alerts, matchesProject]
+    () => filterByActiveProject(alerts, matchesProject, activeProjectSlug ?? 'popy'),
+    [alerts, matchesProject, activeProjectSlug]
   );
 
   const displayProjects = useMemo(

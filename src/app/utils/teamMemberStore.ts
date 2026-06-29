@@ -61,9 +61,10 @@ export function loadTeamMembers(): TeamMemberData[] {
 }
 
 export function getScopedTeamMembers(
-  matchesProject: (entityProjectRef?: string) => boolean
+  matchesProject: (entityProjectRef?: string) => boolean,
+  untaggedAs = 'popy'
 ): TeamMemberData[] {
-  return filterByActiveProject(loadTeamMembers(), matchesProject);
+  return filterByActiveProject(loadTeamMembers(), matchesProject, untaggedAs);
 }
 
 /** Résout un id tâche, id équipe, email ou nom vers un membre du roster */

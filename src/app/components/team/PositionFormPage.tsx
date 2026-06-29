@@ -1,5 +1,7 @@
-import { Briefcase, FileText, Layers } from 'lucide-react';
+import { useState } from 'react';
+import { Briefcase, FileText, Layers, Plus } from 'lucide-react';
 import type { TeamPosition } from '../../data/teamPositions';
+import { DEFAULT_POSITION_CATEGORIES } from '../../utils/positionCategoryStore';
 import { ViewShell, PageBackHeader, ActionButton, AppIcon, FormSelect } from '../shared';
 import { CompetenciesEditor, normalizeCompetencies } from './CompetenciesEditor';
 
@@ -9,18 +11,12 @@ export interface PositionFormValues {
   competencies: string[];
 }
 
+const NEW_CATEGORY_VALUE = '__new_category__';
+
 const inputClass =
   'w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10';
 
 const labelClass = 'block text-sm font-medium text-slate-700 mb-1.5';
-
-const DEFAULT_CATEGORIES = [
-  'Direction & Coordination',
-  'Hardware & IoT',
-  'Intelligence Artificielle',
-  'Cybersécurité & protection enfant',
-  'Cloud, Backend & Big Data',
-];
 
 export function positionToFormValues(position: TeamPosition): PositionFormValues {
   return {
@@ -30,8 +26,12 @@ export function positionToFormValues(position: TeamPosition): PositionFormValues
   };
 }
 
-export function emptyPositionForm(): PositionFormValues {
-  return { title: '', category: DEFAULT_CATEGORIES[0], competencies: [] };
+export function emptyPositionForm(category?: string): PositionFormValues {
+  return {
+    title: '',
+    category: category ?? DEFAULT_POSITION_CATEGORIES[0],
+    competencies: [],
+  };
 }
 
 export function formValuesToPosition(
@@ -55,6 +55,7 @@ interface PositionFormPageProps {
   onBack: () => void;
   onSubmit: (e: React.FormEvent) => void;
   onChange: (values: PositionFormValues) => void;
+  onAddCategory?: (label: string) => void;
 }
 
 export function PositionFormPage({
@@ -65,10 +66,34 @@ export function PositionFormPage({
   onBack,
   onSubmit,
   onChange,
+  onAddCategory,
 }: PositionFormPageProps) {
-  const categoryOptions = Array.from(new Set([...DEFAULT_CATEGORIES, ...categories]));
+  const categoryOptions = Array.from(
+    new Set([...DEFAULT_POSITION_CATEGORIES, ...categories, values.category].filter(Boolean))
+  );
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [creatingCategory, setCreatingCategory] = useState(false);
 
   const patch = (partial: Partial<PositionFormValues>) => onChange({ ...values, ...partial });
+
+  const handleCategoryChange = (value: string) => {
+    if (value === NEW_CATEGORY_VALUE) {
+      setCreatingCategory(true);
+      setNewCategoryName('');
+      return;
+    }
+    setCreatingCategory(false);
+    patch({ category: value });
+  };
+
+  const confirmNewCategory = () => {
+    const label = newCategoryName.trim();
+    if (!label) return;
+    onAddCategory?.(label);
+    patch({ category: label });
+    setCreatingCategory(false);
+    setNewCategoryName('');
+  };
 
   return (
     <ViewShell>
@@ -101,21 +126,47 @@ export function PositionFormPage({
               placeholder="Ex. Ingénieur IA / Vision"
             />
           </div>
-          <div>
+          <div className="space-y-3">
             <label className={labelClass} htmlFor="pos-category">
               Catégorie *
             </label>
             <FormSelect
               id="pos-category"
-              value={values.category}
-              onChange={(e) => patch({ category: e.target.value })}
+              value={creatingCategory ? NEW_CATEGORY_VALUE : values.category}
+              onChange={(e) => handleCategoryChange(e.target.value)}
             >
               {categoryOptions.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>
               ))}
+              <option value={NEW_CATEGORY_VALUE}>+ Nouvelle catégorie…</option>
             </FormSelect>
+            {creatingCategory ? (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className={`${inputClass} flex-1 min-w-0`}
+                  placeholder="Nom de la nouvelle catégorie"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      confirmNewCategory();
+                    }
+                  }}
+                />
+                <ActionButton
+                  type="button"
+                  variant="secondary"
+                  icon={Plus}
+                  className="!rounded-xl shrink-0"
+                  onClick={confirmNewCategory}
+                >
+                  Ajouter
+                </ActionButton>
+              </div>
+            ) : null}
           </div>
         </section>
 
