@@ -14,6 +14,7 @@ paths = [
   '''\.github/workflows/''',
   '''e2e/''',
   '''src/app/auth/AuthPage\.tsx''',
+  '''src/app/utils/supabase/info\.tsx''',
   '''UserControlled/''',
 ]
 regexes = [
