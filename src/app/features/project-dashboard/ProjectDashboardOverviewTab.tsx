@@ -1,9 +1,31 @@
-import { ArrowRight, Award, CheckCircle, Clock, Target, AlertTriangle } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Briefcase,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Lightbulb,
+  Sparkles,
+  Target,
+  Zap,
+} from 'lucide-react';
 import type { Project } from '../../types';
 import type { ProjectDashboardAlert, ProjectDashboardStats, ProjectDashboardTab } from '../../types/projectDashboard';
-import { ViewHighlightBanner, ViewStatCard, ViewStatsGrid } from '../../components/shared';
-import { getPriorityLabel, getStatusColor, getStatusLabel } from '../projects/components/projectPresentation';
-import { severityBadgeClass } from './projectDashboardPresentation';
+import { ViewHighlightBanner } from '../../components/shared';
+import {
+  getDaysUntilDeadline,
+  getPriorityLabel,
+  getProjectBudget,
+  getStatusColor,
+  getStatusHint,
+  getStatusLabel,
+} from '../projects/components/projectPresentation';
+import {
+  getHealthAssessment,
+  getOverviewPriorityMessage,
+  severityBadgeClass,
+} from './projectDashboardPresentation';
 import { ProjectDashboardQuickCard } from './ProjectDashboardQuickCard';
 
 interface ProjectDashboardOverviewTabProps {
@@ -19,225 +41,392 @@ export function ProjectDashboardOverviewTab({
   alerts,
   onGoTab,
 }: ProjectDashboardOverviewTabProps) {
+  const assessment = getHealthAssessment(stats.healthScore, stats.criticalAlerts, stats.warningAlerts);
+  const priorityMessage = getOverviewPriorityMessage(stats, alerts.length);
+  const previewAlerts = alerts.slice(0, 3);
   const circumference = 553;
   const dash = (stats.healthScore / 100) * circumference;
-  const previewAlerts = alerts.slice(0, 3);
+
+  const bannerTheme =
+    assessment.bannerTheme === 'emerald'
+      ? 'emerald'
+      : assessment.bannerTheme === 'amber'
+        ? 'amber'
+        : 'red';
 
   return (
-    <div className="space-y-4 sm:space-y-5 min-w-0">
+    <div className="space-y-5 sm:space-y-6 min-w-0">
       <ViewHighlightBanner
-        title={activeProject ? `Pilotage — ${activeProject.name}` : 'Pilotage projet'}
-        subtitle={`${stats.activeProjects} projet(s) actif(s) · ${stats.tasksInProgress} tâche(s) en cours · ${stats.criticalAlerts} alerte(s) critique(s)`}
+        title={activeProject ? activeProject.name : 'Pilotage projet'}
+        subtitle={`${assessment.label} · ${stats.tasksInProgress} tâche(s) · ${alerts.length} alerte(s)`}
         value={`${stats.healthScore}%`}
         progress={stats.healthScore}
-        theme="indigo"
+        theme={bannerTheme}
       />
 
-      <div className="rounded-2xl border border-indigo-200/80 bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-5 sm:p-8 text-white shadow-lg overflow-hidden relative">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
-        <div className="relative flex flex-col lg:flex-row items-center gap-6 lg:gap-8">
-          <div className="flex-1 w-full space-y-4">
-            <div className="flex items-center gap-3">
-              <Award className="w-9 h-9 sm:w-10 sm:h-10 shrink-0" />
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold">Santé du projet</h2>
-                <p className="text-indigo-100 text-sm">Avancement, alertes et charge opérationnelle</p>
-              </div>
+      {priorityMessage ? (
+        <div
+          className={`rounded-2xl border px-4 py-3.5 sm:px-5 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-3 ${
+            stats.criticalAlerts > 0
+              ? 'border-red-200 bg-red-50/80'
+              : 'border-amber-200 bg-amber-50/80'
+          }`}
+        >
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <Lightbulb
+              className={`w-5 h-5 shrink-0 mt-0.5 ${
+                stats.criticalAlerts > 0 ? 'text-red-600' : 'text-amber-600'
+              }`}
+            />
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Que faire maintenant ?</p>
+              <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">{priorityMessage}</p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-              <MiniStat label="Projets" value={String(stats.activeProjects)} />
-              <MiniStat label="Tâches" value={String(stats.tasksInProgress)} />
-              <MiniStat label="Critiques" value={String(stats.criticalAlerts)} />
-              <MiniStat
-                label="Réussite"
-                value={stats.successRate != null ? `${stats.successRate}%` : '—'}
+          </div>
+          {stats.criticalAlerts > 0 ? (
+            <button
+              type="button"
+              onClick={() => onGoTab('alerts')}
+              className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
+            >
+              Voir les alertes
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Santé — carte principale */}
+      <div className="rounded-2xl border border-indigo-200/80 bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-5 sm:p-7 text-white shadow-lg overflow-hidden relative">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+        <div className="relative grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-center">
+          <div className="space-y-4 min-w-0">
+            <div>
+              <p className="text-indigo-200 text-xs font-semibold uppercase tracking-wider">
+                Indicateur de santé
+              </p>
+              <h2 className="text-xl sm:text-2xl font-bold mt-1">{assessment.label}</h2>
+              <p className="text-indigo-100 text-sm mt-1.5 leading-relaxed">{assessment.hint}</p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <KpiChip label="Projets" value={String(stats.activeProjects)} onClick={() => onGoTab('project')} />
+              <KpiChip label="Tâches" value={String(stats.tasksInProgress)} />
+              <KpiChip
+                label="Critiques"
+                value={String(stats.criticalAlerts)}
+                highlight={stats.criticalAlerts > 0}
+                onClick={() => onGoTab('alerts')}
+              />
+              <KpiChip
+                label="Avancement"
+                value={`${stats.projectProgress}%`}
+                onClick={() => onGoTab('project')}
               />
             </div>
           </div>
-          <div className="relative w-36 h-36 sm:w-44 sm:h-44 shrink-0">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 192 192">
-              <circle cx="96" cy="96" r="88" stroke="rgba(255,255,255,0.2)" strokeWidth="14" fill="none" />
+          <div className="relative w-32 h-32 sm:w-40 sm:h-40 mx-auto lg:mx-0 shrink-0">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 192 192" aria-hidden>
+              <circle cx="96" cy="96" r="88" stroke="rgba(255,255,255,0.2)" strokeWidth="12" fill="none" />
               <circle
                 cx="96"
                 cy="96"
                 r="88"
                 stroke="white"
-                strokeWidth="14"
+                strokeWidth="12"
                 fill="none"
                 strokeDasharray={`${dash} ${circumference}`}
                 strokeLinecap="round"
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-4xl sm:text-5xl font-bold">{stats.healthScore}%</span>
-              <span className="text-xs text-indigo-200">Santé</span>
+              <span className="text-3xl sm:text-4xl font-bold tabular-nums">{stats.healthScore}%</span>
+              <span className="text-[11px] text-indigo-200 font-medium">Santé</span>
             </div>
           </div>
         </div>
       </div>
 
-      <ViewStatsGrid cols={2} className="sm:grid-cols-4">
-        <ViewStatCard
-          label="Projets actifs"
-          value={String(stats.activeProjects)}
-          gradient="from-indigo-500 to-violet-600"
-          icon={Target}
-        />
-        <ViewStatCard
-          label="Tâches en cours"
-          value={String(stats.tasksInProgress)}
-          gradient="from-amber-500 to-orange-500"
-          icon={Clock}
-        />
-        <ViewStatCard
-          label="Taux de réussite"
-          value={stats.successRate != null ? `${stats.successRate}%` : '—'}
-          gradient="from-emerald-500 to-teal-600"
-          icon={CheckCircle}
-        />
-        <ViewStatCard
-          label="Alertes critiques"
-          value={String(stats.criticalAlerts)}
-          gradient="from-red-500 to-rose-600"
-          icon={AlertTriangle}
-        />
-      </ViewStatsGrid>
-
-      <section className="rounded-xl sm:rounded-2xl border border-stone-200/90 bg-white p-4 sm:p-5 shadow-sm min-w-0">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-          <h3 className="font-semibold text-stone-900 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-red-600" />
-            Alertes à traiter
-          </h3>
-          <button
-            type="button"
-            onClick={() => onGoTab('alerts')}
-            className="text-sm font-medium text-indigo-700 hover:text-indigo-900 inline-flex items-center gap-1"
-          >
-            Gérer les alertes
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-        {previewAlerts.length === 0 ? (
-          <p className="text-sm text-slate-500 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-5 text-center">
-            Aucune alerte pour ce projet.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {previewAlerts.map((alert) => (
-              <li
-                key={alert.id}
-                className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-2.5 min-w-0"
-              >
-                <AlertTriangle
-                  className={`w-4 h-4 shrink-0 mt-0.5 ${alert.severity === 'critical' ? 'text-red-600' : 'text-amber-600'}`}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-slate-800 break-words">{alert.message}</p>
-                  <span className={`inline-flex mt-1.5 saas-badge border text-[10px] ${severityBadgeClass(alert.severity)}`}>
-                    {alert.severity === 'critical' ? 'Critique' : 'Avertissement'}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {activeProject ? (
-        <section className="rounded-xl sm:rounded-2xl border border-stone-200/90 bg-white p-4 sm:p-5 shadow-sm min-w-0">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-            <h3 className="font-semibold text-stone-900">Projet en cours</h3>
-            <button
-              type="button"
-              onClick={() => onGoTab('project')}
-              className="text-sm font-medium text-indigo-700 hover:text-indigo-900 inline-flex items-center gap-1"
-            >
-              Voir le détail
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          <ProjectSnapshotCard project={activeProject} />
-        </section>
-      ) : null}
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        <ProjectDashboardQuickCard
-          title="Alertes"
-          hint={`${alerts.length} signalée(s)`}
-          value={String(stats.criticalAlerts)}
-          tone="red"
-          onClick={() => onGoTab('alerts')}
-        />
-        <ProjectDashboardQuickCard
+      {/* Projet + alertes côte à côte */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-5">
+        <OverviewPanel
           title="Projet actif"
-          hint={activeProject?.name ?? 'Aucun projet'}
-          value={activeProject ? `${stats.projectProgress}%` : '—'}
-          tone="indigo"
-          onClick={() => onGoTab('project')}
-        />
-        <ProjectDashboardQuickCard
-          title="Actions rapides"
-          hint="Créer, planifier, rapporter"
-          value="3"
-          tone="violet"
-          onClick={() => onGoTab('actions')}
-        />
+          icon={<Briefcase className="w-5 h-5 text-indigo-600" />}
+          actionLabel="Fiche complète"
+          onAction={() => onGoTab('project')}
+        >
+          {activeProject ? (
+            <ProjectFocusCard project={activeProject} onOpen={() => onGoTab('project')} />
+          ) : (
+            <EmptyHint
+              message="Sélectionnez un projet dans le menu en haut de l'écran pour afficher son suivi."
+            />
+          )}
+        </OverviewPanel>
+
+        <OverviewPanel
+          title="Alertes à traiter"
+          icon={<AlertTriangle className="w-5 h-5 text-red-600" />}
+          actionLabel={alerts.length > 0 ? 'Tout voir' : 'Créer une alerte'}
+          onAction={() => onGoTab('alerts')}
+        >
+          {previewAlerts.length === 0 ? (
+            <EmptyHint
+              message="Aucune alerte — le projet est calme sur ce point."
+              positive
+            />
+          ) : (
+            <ul className="space-y-2">
+              {previewAlerts.map((alert, index) => (
+                <li key={alert.id}>
+                  <button
+                    type="button"
+                    onClick={() => onGoTab('alerts')}
+                    className="w-full text-left flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-white hover:border-slate-200 hover:shadow-sm px-3 py-3 transition-all min-w-0"
+                  >
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-500">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-slate-800 line-clamp-2 leading-snug">{alert.message}</p>
+                      <span
+                        className={`inline-flex mt-1.5 saas-badge border text-[10px] ${severityBadgeClass(alert.severity)}`}
+                      >
+                        {alert.severity === 'critical' ? 'Critique' : 'Avertissement'}
+                      </span>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-slate-300 shrink-0 mt-1" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </OverviewPanel>
       </div>
+
+      {/* Navigation intuitive */}
+      <section className="min-w-0">
+        <div className="flex items-center gap-2 mb-3 sm:mb-4">
+          <Sparkles className="w-5 h-5 text-violet-600" />
+          <h3 className="font-semibold text-slate-900">Aller plus loin</h3>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+          <ProjectDashboardQuickCard
+            icon={AlertTriangle}
+            title="Alertes"
+            value={String(alerts.length)}
+            hint={
+              stats.criticalAlerts > 0
+                ? `${stats.criticalAlerts} critique(s) à traiter`
+                : 'Suivi des risques projet'
+            }
+            tone="red"
+            onClick={() => onGoTab('alerts')}
+          />
+          <ProjectDashboardQuickCard
+            icon={Target}
+            title="Projet"
+            value={activeProject ? `${stats.projectProgress}%` : '—'}
+            hint={activeProject?.name ?? 'Choisir un projet'}
+            tone="indigo"
+            onClick={() => onGoTab('project')}
+          />
+          <ProjectDashboardQuickCard
+            icon={Clock}
+            title="Tâches"
+            value={String(stats.tasksInProgress)}
+            hint="En cours ou bloquées"
+            tone="sky"
+            onClick={() => onGoTab('actions')}
+          />
+          <ProjectDashboardQuickCard
+            icon={Zap}
+            title="Actions"
+            value="3"
+            hint="Créer, planifier, rapporter"
+            tone="violet"
+            onClick={() => onGoTab('actions')}
+          />
+        </div>
+      </section>
     </div>
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
+function OverviewPanel({
+  title,
+  icon,
+  actionLabel,
+  onAction,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  actionLabel: string;
+  onAction: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="rounded-xl bg-white/10 border border-white/15 px-3 py-2.5 text-center">
-      <p className="text-lg sm:text-xl font-bold">{value}</p>
-      <p className="text-[11px] text-indigo-100">{label}</p>
+    <section className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm min-w-0 flex flex-col h-full">
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <h3 className="font-semibold text-slate-900 flex items-center gap-2 min-w-0">
+          {icon}
+          <span className="truncate">{title}</span>
+        </h3>
+        <button
+          type="button"
+          onClick={onAction}
+          className="text-xs sm:text-sm font-semibold text-indigo-700 hover:text-indigo-900 inline-flex items-center gap-1 shrink-0"
+        >
+          {actionLabel}
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <div className="flex-1 min-w-0">{children}</div>
+    </section>
+  );
+}
+
+function KpiChip({
+  label,
+  value,
+  highlight,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+  onClick?: () => void;
+}) {
+  const className = `rounded-xl px-3 py-2.5 text-center transition-colors ${
+    highlight
+      ? 'bg-red-500/25 border border-red-300/40 hover:bg-red-500/35'
+      : 'bg-white/10 border border-white/15 hover:bg-white/15'
+  } ${onClick ? 'cursor-pointer' : ''}`;
+
+  const inner = (
+    <>
+      <p className="text-base sm:text-lg font-bold tabular-nums">{value}</p>
+      <p className="text-[10px] sm:text-[11px] text-indigo-100">{label}</p>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={className}>
+        {inner}
+      </button>
+    );
+  }
+  return <div className={className}>{inner}</div>;
+}
+
+function EmptyHint({ message, positive }: { message: string; positive?: boolean }) {
+  return (
+    <div
+      className={`rounded-xl border border-dashed p-6 text-center text-sm leading-relaxed ${
+        positive
+          ? 'border-emerald-200 bg-emerald-50/50 text-emerald-800'
+          : 'border-slate-200 bg-slate-50/50 text-slate-500'
+      }`}
+    >
+      {positive ? (
+        <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+      ) : null}
+      {message}
     </div>
   );
 }
 
-function ProjectSnapshotCard({ project }: { project: Project }) {
-  const budgetUsed = project.budget?.used ?? 0;
-  const budgetTotal = project.budget?.total ?? 0;
-  const budgetPct = budgetTotal > 0 ? Math.round((budgetUsed / budgetTotal) * 100) : 0;
+function ProjectFocusCard({ project, onOpen }: { project: Project; onOpen: () => void }) {
+  const { used, total } = getProjectBudget(project);
+  const budgetPct = total > 0 ? Math.round((used / total) * 100) : 0;
+  const daysLeft = getDaysUntilDeadline(project.deadline);
+  const deadlineLabel =
+    daysLeft < 0
+      ? `En retard de ${Math.abs(daysLeft)} j`
+      : daysLeft === 0
+        ? "Échéance aujourd'hui"
+        : `J-${daysLeft}`;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 sm:p-5 min-w-0">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full text-left rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/50 p-4 sm:p-5 hover:shadow-md hover:border-indigo-200 transition-all min-w-0 group"
+    >
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h4 className="font-semibold text-slate-900 text-base break-words">{project.name}</h4>
-          <div className="flex flex-wrap gap-2 mt-2">
+          <h4 className="font-semibold text-slate-900 text-base sm:text-lg break-words group-hover:text-indigo-800 transition-colors">
+            {project.name}
+          </h4>
+          <div className="flex flex-wrap gap-1.5 mt-2">
             <span className={`saas-badge ${getStatusColor(project.status)}`}>
               {getStatusLabel(project.status)}
             </span>
             <span className="saas-badge saas-badge-neutral">
-              Priorité {getPriorityLabel(project.priority)}
+              {getPriorityLabel(project.priority)}
             </span>
           </div>
         </div>
-        <p className="text-2xl font-bold text-indigo-700 shrink-0">{project.progress}%</p>
-      </div>
-      <div className="mt-4 h-2 rounded-full bg-slate-200 overflow-hidden">
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-600"
-          style={{ width: `${project.progress}%` }}
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3 mt-4 text-xs text-slate-600">
-        <div>
-          <p className="text-slate-400 uppercase tracking-wide text-[10px] font-semibold">Échéance</p>
-          <p className="font-medium text-slate-800 mt-0.5">
-            {new Date(project.deadline).toLocaleDateString('fr-FR')}
-          </p>
-        </div>
-        <div>
-          <p className="text-slate-400 uppercase tracking-wide text-[10px] font-semibold">Budget</p>
-          <p className="font-medium text-slate-800 mt-0.5">
-            {(budgetUsed / 1000).toFixed(0)}k€ / {(budgetTotal / 1000).toFixed(0)}k€ ({budgetPct}%)
-          </p>
+        <div className="text-right shrink-0">
+          <p className="text-2xl sm:text-3xl font-bold text-indigo-700 tabular-nums">{project.progress}%</p>
+          <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Avancement</p>
         </div>
       </div>
-    </div>
+
+      <div className="mt-4 space-y-3">
+        <div>
+          <div className="flex justify-between text-xs text-slate-500 mb-1">
+            <span>Progression</span>
+            <span>{project.progress}%</span>
+          </div>
+          <div className="h-2.5 rounded-full bg-slate-200 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-600"
+              style={{ width: `${project.progress}%` }}
+            />
+          </div>
+        </div>
+        <div>
+          <div className="flex justify-between text-xs text-slate-500 mb-1">
+            <span>Budget consommé</span>
+            <span>{budgetPct}%</span>
+          </div>
+          <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+            <div
+              className={`h-full rounded-full ${
+                budgetPct > 90 ? 'bg-red-500' : budgetPct > 75 ? 'bg-amber-500' : 'bg-emerald-500'
+              }`}
+              style={{ width: `${Math.min(budgetPct, 100)}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-100">
+        <div className="flex items-center gap-2 min-w-0">
+          <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase font-semibold text-slate-400">Échéance</p>
+            <p className="text-xs font-semibold text-slate-800 truncate">{deadlineLabel}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 min-w-0">
+          <Target className="w-4 h-4 text-slate-400 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase font-semibold text-slate-400">Budget</p>
+            <p className="text-xs font-semibold text-slate-800 truncate">
+              {(used / 1000).toFixed(0)}k / {(total / 1000).toFixed(0)}k€
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {project.deadline ? (
+        <p className="text-xs text-slate-500 mt-3 line-clamp-2">
+          {getStatusHint(project.status, project.deadline)}
+        </p>
+      ) : null}
+    </button>
   );
 }
