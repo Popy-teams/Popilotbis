@@ -68,9 +68,7 @@ export function PositionFormPage({
   onChange,
   onAddCategory,
 }: PositionFormPageProps) {
-  const categoryOptions = Array.from(
-    new Set([...DEFAULT_POSITION_CATEGORIES, ...categories, values.category].filter(Boolean))
-  );
+  const categoryOptions = Array.from(new Set([...categories, values.category].filter(Boolean)));
   const [newCategoryName, setNewCategoryName] = useState('');
   const [creatingCategory, setCreatingCategory] = useState(false);
 

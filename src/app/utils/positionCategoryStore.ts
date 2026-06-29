@@ -58,3 +58,28 @@ export function addPositionCategory(label: string, existing: string[]): string[]
   savePositionCategories(next);
   return next;
 }
+
+export function removePositionCategory(label: string, existing: string[]): string[] {
+  const key = normalizeCategoryLabel(label).toLowerCase();
+  if (!key) return existing;
+  const next = existing.filter((c) => c.toLowerCase() !== key);
+  savePositionCategories(next);
+  return next;
+}
+
+export function isDefaultPositionCategory(label: string): boolean {
+  const key = normalizeCategoryLabel(label).toLowerCase();
+  return DEFAULT_POSITION_CATEGORIES.some((c) => c.toLowerCase() === key);
+}
+
+export function countCategoryUsage(
+  label: string,
+  positions: { category: string }[],
+  members: { category: string }[]
+): { positions: number; members: number } {
+  const key = normalizeCategoryLabel(label).toLowerCase();
+  return {
+    positions: positions.filter((p) => p.category.toLowerCase() === key).length,
+    members: members.filter((m) => m.category.toLowerCase() === key).length,
+  };
+}
