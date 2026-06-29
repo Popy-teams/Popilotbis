@@ -12,16 +12,24 @@ type Mode = 'list' | 'create' | 'view' | 'edit';
 type SortKey = 'deadline' | 'progress' | 'status';
 type SortDirection = 'asc' | 'desc';
 
-const emptyForm = {
-  name: '',
-  description: '',
-  priority: 'medium' as Project['priority'],
-  startDate: '',
-  deadline: '',
-  budgetTotal: '',
-  selectedMembers: [] as string[],
-  isRestricted: true,
-};
+function defaultDate(offsetDays = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+}
+
+function createEmptyForm(currentMemberId?: string) {
+  return {
+    name: '',
+    description: '',
+    priority: 'medium' as Project['priority'],
+    startDate: defaultDate(0),
+    deadline: defaultDate(90),
+    budgetTotal: '0',
+    selectedMembers: currentMemberId ? [currentMemberId] : [],
+    isRestricted: false,
+  };
+}
 
 export function ProjectsFeature() {
   const { user } = useAuth();
@@ -40,7 +48,8 @@ export function ProjectsFeature() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [mode, setMode] = useState<Mode>('list');
   const [selected, setSelected] = useState<Project | null>(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(createEmptyForm);
+  const [submitError, setSubmitError] = useState('');
   const [loading] = useState(false);
 
   useEffect(() => {
@@ -112,11 +121,16 @@ export function ProjectsFeature() {
       status: base?.status === 'archived' ? 'archived' : undefined,
     });
 
+    const ownerId = base?.ownerId ?? currentMemberId ?? user?.id;
+    const restrictedParticipants = [
+      ...new Set([...form.selectedMembers, ownerId].filter(Boolean)),
+    ] as string[];
+
     return {
       id: base?.id || `project:local-${Date.now()}`,
-      name: form.name,
+      name: form.name.trim(),
       slug,
-      description: form.description,
+      description: form.description.trim(),
       status,
       priority: form.priority,
       progress,
@@ -124,15 +138,16 @@ export function ProjectsFeature() {
       deadline: form.deadline,
       budget: { total: parseInt(form.budgetTotal || '0', 10), used: getProjectBudget(base).used },
       team: selectedMemberInitials,
-      participantIds: form.isRestricted ? form.selectedMembers : members.map((m) => m.id),
+      participantIds: form.isRestricted ? restrictedParticipants : members.map((m) => m.id),
       isRestricted: form.isRestricted,
-      ownerId: base?.ownerId ?? currentMemberId ?? user?.id,
+      ownerId,
       objectives: base?.objectives || [],
     };
   };
 
   const startCreate = () => {
-    setForm({ ...emptyForm, selectedMembers: currentMemberId ? [currentMemberId] : [] });
+    setSubmitError('');
+    setForm(createEmptyForm(currentMemberId || undefined));
     setMode('create');
   };
 
@@ -155,11 +170,17 @@ export function ProjectsFeature() {
 
   const submitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.name.trim() || !form.description.trim() || !form.deadline) {
+      setSubmitError('Veuillez renseigner le nom, la description et la date d\'échéance.');
+      return;
+    }
+    setSubmitError('');
     const next = toProject();
     upsertProject(next);
     setActiveProjectId(next.id);
+    setStatusFilter('all');
     setMode('list');
-    setForm(emptyForm);
+    setForm(createEmptyForm(currentMemberId || undefined));
     try {
       await createProject(next);
     } catch {}
@@ -205,6 +226,7 @@ export function ProjectsFeature() {
         values={form}
         members={members}
         submitLabel="Créer le projet"
+        submitError={submitError}
         onBack={() => setMode('list')}
         onChange={setForm}
         onSubmit={submitCreate}

@@ -42,36 +42,38 @@ export function PersonalSpaceView() {
         theme="blue"
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <PersonalStatCard
-          label="Profil complété"
-          value={`${stats.completion}%`}
-          hint={stats.completion < 100 ? 'Complétez vos informations' : 'Profil à jour'}
-          tone={stats.completion >= 80 ? 'good' : 'sky'}
-          icon={CheckCircle2}
-        />
-        <PersonalStatCard
-          label="Rôle"
-          value={stats.roleLabel}
-          hint="Droits dans POPILOT"
-          tone="violet"
-          icon={UserCircle}
-        />
-        <PersonalStatCard
-          label="Notifications"
-          value={String(activeNotifications)}
-          hint="Canaux actifs"
-          tone="amber"
-          icon={Mail}
-        />
-        <PersonalStatCard
-          label="Membre depuis"
-          value={stats.memberSince.split(' ').slice(-2).join(' ')}
-          hint={user.email}
-          tone="sky"
-          icon={Calendar}
-        />
-      </div>
+      {activeTab === 'overview' ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <PersonalStatCard
+            label="Profil complété"
+            value={`${stats.completion}%`}
+            hint={stats.completion < 100 ? 'Complétez vos informations' : 'Profil à jour'}
+            tone={stats.completion >= 80 ? 'good' : 'sky'}
+            icon={CheckCircle2}
+          />
+          <PersonalStatCard
+            label="Rôle"
+            value={stats.roleLabel}
+            hint="Droits dans POPILOT"
+            tone="violet"
+            icon={UserCircle}
+          />
+          <PersonalStatCard
+            label="Notifications"
+            value={String(activeNotifications)}
+            hint="Canaux actifs"
+            tone="amber"
+            icon={Mail}
+          />
+          <PersonalStatCard
+            label="Membre depuis"
+            value={stats.memberSince.split(' ').slice(-2).join(' ')}
+            hint={user.email}
+            tone="sky"
+            icon={Calendar}
+          />
+        </div>
+      ) : null}
 
       <PersonalTabNav
         activeTab={activeTab}
@@ -88,7 +90,7 @@ export function PersonalSpaceView() {
         />
       ) : null}
       {activeTab === 'profile' ? (
-        <PersonalInfoTab profile={profile} onSave={handleSave} />
+        <PersonalInfoTab user={user} profile={profile} stats={stats} onSave={handleSave} />
       ) : null}
       {activeTab === 'preferences' ? (
         <PersonalPreferencesTab profile={profile} onSave={handleSave} />

@@ -79,8 +79,8 @@ export function AuditView() {
   }, [activeProjectSlug, auditBlocks, matchesProject]);
 
   const scopedBlocks = useMemo(
-    () => filterByActiveProject(auditBlocks, matchesProject),
-    [auditBlocks, matchesProject]
+    () => filterByActiveProject(auditBlocks, matchesProject, activeProjectSlug ?? 'popy'),
+    [auditBlocks, matchesProject, activeProjectSlug]
   );
 
   const stats = useMemo(() => computeAuditStats(scopedBlocks), [scopedBlocks]);

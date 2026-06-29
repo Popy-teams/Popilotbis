@@ -202,13 +202,13 @@ export function BudgetFeature() {
   }, [dataNotice]);
 
   const scopedCategories = useMemo(
-    () => getScopedCategories(categories, matchesProject),
-    [categories, matchesProject]
+    () => getScopedCategories(categories, matchesProject, activeProjectSlug ?? 'popy'),
+    [categories, matchesProject, activeProjectSlug]
   );
 
   const scopedBomComponents = useMemo(
-    () => filterByActiveProject(bomComponents, matchesProject),
-    [bomComponents, matchesProject]
+    () => filterByActiveProject(bomComponents, matchesProject, activeProjectSlug ?? 'popy'),
+    [bomComponents, matchesProject, activeProjectSlug]
   );
 
   const categoryIds = useMemo(() => scopedCategories.map((c) => c.id), [scopedCategories]);

@@ -5,7 +5,7 @@ import {
   Phone,
   Award,
   Users,
-  Pencil,
+  SquarePen,
   Trash2,
   Eye,
   Briefcase,
@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   TrendingUp,
+  FolderPlus,
 } from 'lucide-react';
 import { useProjectContext } from '../context/ProjectContext';
 import { filterByActiveProject } from '../utils/projectMatch';
@@ -63,6 +64,12 @@ import {
   positionToFormValues,
   type PositionFormValues,
 } from './team/PositionFormPage';
+import { AddPositionCategoryModal } from './team/AddPositionCategoryModal';
+import {
+  addPositionCategory,
+  loadPositionCategories,
+  mergePositionCategoryLists,
+} from '../utils/positionCategoryStore';
 
 import { TEAM_STORAGE_KEY } from '../utils/teamMemberStore';
 
@@ -120,6 +127,9 @@ export function TeamViewWithTestData() {
   const [selectedMember, setSelectedMember] = useState<TeamMemberData | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<TeamPosition | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedPositionCategory, setSelectedPositionCategory] = useState<string | null>(null);
+  const [positionCategories, setPositionCategories] = useState<string[]>(() => loadPositionCategories());
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [memberForm, setMemberForm] = useState<MemberFormValues>(emptyMemberForm());
   const [positionForm, setPositionForm] = useState<PositionFormValues>(emptyPositionForm());
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -170,13 +180,13 @@ export function TeamViewWithTestData() {
   }, [positions]);
 
   const scopedMembers = useMemo(
-    () => filterByActiveProject(members, matchesProject),
-    [members, matchesProject]
+    () => filterByActiveProject(members, matchesProject, activeProjectSlug ?? 'popy'),
+    [members, matchesProject, activeProjectSlug]
   );
 
   const scopedPositions = useMemo(
-    () => filterByActiveProject(positions, matchesProject),
-    [positions, matchesProject]
+    () => filterByActiveProject(positions, matchesProject, activeProjectSlug ?? 'popy'),
+    [positions, matchesProject, activeProjectSlug]
   );
 
   const projectTasks = useMemo(
@@ -204,9 +214,21 @@ export function TeamViewWithTestData() {
   );
 
   const categories = getPositionCategories(scopedPositions);
+  const allPositionCategories = useMemo(
+    () => mergePositionCategoryLists(positionCategories, categories),
+    [positionCategories, categories]
+  );
   const filteredMembers = selectedCategory
     ? membersEnriched.filter((m) => m.category === selectedCategory)
     : membersEnriched;
+  const filteredPositions = selectedPositionCategory
+    ? scopedPositions.filter((p) => p.category === selectedPositionCategory)
+    : scopedPositions;
+
+  const handleAddPositionCategory = (label: string) => {
+    setPositionCategories((prev) => addPositionCategory(label, prev));
+    setSelectedPositionCategory(label);
+  };
 
   const buildMember = (values: MemberFormValues, base?: TeamMemberData): TeamMemberData | null => {
     const position = getPositionById(scopedPositions, values.positionId);
@@ -271,7 +293,7 @@ export function TeamViewWithTestData() {
       );
     }
     setPositionMode('list');
-    setPositionForm(emptyPositionForm());
+    setPositionForm(emptyPositionForm(allPositionCategories[0]));
     setSelectedPosition(null);
   };
 
@@ -322,7 +344,7 @@ export function TeamViewWithTestData() {
       <PositionFormPage
         mode={positionMode}
         values={positionForm}
-        categories={categories}
+        categories={allPositionCategories}
         submitLabel={positionMode === 'create' ? 'Créer le poste' : 'Enregistrer'}
         onBack={() => {
           setPositionMode('list');
@@ -330,6 +352,7 @@ export function TeamViewWithTestData() {
         }}
         onSubmit={submitPosition}
         onChange={setPositionForm}
+        onAddCategory={handleAddPositionCategory}
       />
     );
   }
@@ -476,7 +499,7 @@ export function TeamViewWithTestData() {
                 setPhotoPreview(null);
                 setMemberMode('create');
               } else {
-                setPositionForm(emptyPositionForm());
+                setPositionForm(emptyPositionForm(allPositionCategories[0]));
                 setPositionMode('create');
               }
             }}
@@ -516,24 +539,71 @@ export function TeamViewWithTestData() {
       </ViewTabPills>
 
       {mainTab === 'positions' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {scopedPositions.map((position) => {
-            const assignedMembers = members.filter((m) => m.positionId === position.id);
-            return (
-              <PositionCard
-                key={position.id}
-                position={position}
-                assignedMembers={assignedMembers}
-                onEdit={() => {
-                  setSelectedPosition(position);
-                  setPositionForm(positionToFormValues(position));
-                  setPositionMode('edit');
-                }}
-                onDelete={() => removePosition(position.id)}
-              />
-            );
-          })}
-        </div>
+        <>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setSelectedPositionCategory(null)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                selectedPositionCategory === null
+                  ? 'bg-stone-800 text-white'
+                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              }`}
+            >
+              Tous
+            </button>
+            {allPositionCategories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedPositionCategory(cat)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium max-w-full truncate transition-colors ${
+                  selectedPositionCategory === cat
+                    ? 'bg-stone-800 text-white'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+                title={cat}
+              >
+                {shortCategoryLabel(cat)}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setShowCategoryModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border border-dashed border-violet-300 text-violet-700 bg-violet-50/60 hover:bg-violet-50 transition-colors"
+            >
+              <FolderPlus className="w-4 h-4 shrink-0" />
+              Catégorie
+            </button>
+          </div>
+
+          {filteredPositions.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-600">
+              {scopedPositions.length === 0
+                ? 'Aucun poste pour ce projet. Créez une fiche poste pour structurer l’équipe.'
+                : 'Aucun poste dans cette catégorie.'}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 min-w-0 w-full">
+              {filteredPositions.map((position) => {
+                const assignedMembers = members.filter((m) => m.positionId === position.id);
+                return (
+                  <PositionCard
+                    key={position.id}
+                    position={position}
+                    assignedMembers={assignedMembers}
+                    onEdit={() => {
+                      setSelectedPosition(position);
+                      setPositionForm(positionToFormValues(position));
+                      setPositionMode('edit');
+                    }}
+                    onDelete={() => removePosition(position.id)}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </>
       ) : (
         <>
           <div className="flex items-center gap-2 flex-wrap">
@@ -575,6 +645,13 @@ export function TeamViewWithTestData() {
           </div>
         </>
       )}
+      {showCategoryModal ? (
+        <AddPositionCategoryModal
+          existing={allPositionCategories}
+          onClose={() => setShowCategoryModal(false)}
+          onAdd={handleAddPositionCategory}
+        />
+      ) : null}
     </ViewShell>
   );
 }
@@ -710,7 +787,7 @@ function MemberCard({
             className="w-9 h-9 inline-flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-500 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
             title="Modifier"
           >
-            <Pencil className="w-4 h-4" />
+            <SquarePen className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -805,53 +882,35 @@ function PositionCard({
 }) {
   const accent = getCategoryAccent(position.category);
   const CategoryIcon = accent.Icon;
-  const visibleSkills = position.competencies.slice(0, 5);
+  const visibleSkills = position.competencies.slice(0, 4);
   const extraSkills = position.competencies.length - visibleSkills.length;
   const memberCount = assignedMembers.length;
 
   return (
-    <article className="group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
-      <div className={`h-1.5 w-full bg-gradient-to-r ${accent.gradient}`} />
+    <article className="flex flex-col h-full min-w-0 w-full bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-200">
+      <div className={`h-1 w-full bg-gradient-to-r ${accent.gradient} shrink-0`} />
 
-      <div className="p-5 sm:p-6 border-b border-slate-100">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0 flex-1">
-            <div
-              className={`w-12 h-12 rounded-2xl ${accent.iconBg} ${accent.iconColor} inline-flex items-center justify-center shrink-0 shadow-sm`}
-            >
-              <CategoryIcon className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-semibold text-slate-900 text-base leading-snug">{position.title}</h3>
-              <span className={`inline-flex mt-2 saas-badge border text-[11px] ${accent.badge}`}>
-                {position.category}
-              </span>
-            </div>
+      <div className="p-4 sm:p-5 flex-1 flex flex-col gap-4 min-w-0">
+        <div className="flex items-start gap-3 min-w-0">
+          <div
+            className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl ${accent.iconBg} ${accent.iconColor} inline-flex items-center justify-center shrink-0`}
+          >
+            <CategoryIcon className="w-5 h-5" />
           </div>
-          <div className="flex gap-1 shrink-0 opacity-80 group-hover:opacity-100">
-            <button
-              type="button"
-              onClick={onEdit}
-              className="w-9 h-9 inline-flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-500"
-              title="Modifier"
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold text-slate-900 text-sm sm:text-base leading-snug break-words">
+              {position.title}
+            </h3>
+            <span
+              className={`inline-flex mt-2 max-w-full saas-badge border text-[11px] leading-tight break-words ${accent.badge}`}
             >
-              <Pencil className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              className="w-9 h-9 inline-flex items-center justify-center rounded-xl hover:bg-red-50 text-red-600"
-              title="Supprimer"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+              {position.category}
+            </span>
           </div>
         </div>
-      </div>
 
-      <div className="px-5 sm:px-6 py-4">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex -space-x-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <div className="flex -space-x-2 shrink-0">
             {assignedMembers.slice(0, 4).map((m) => (
               <div
                 key={m.id}
@@ -867,44 +926,58 @@ function PositionCard({
               </div>
             ) : null}
           </div>
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-slate-500 break-words">
             {memberCount === 0
               ? 'Aucun membre assigné'
               : `${memberCount} membre${memberCount > 1 ? 's' : ''}`}
           </span>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          {visibleSkills.map((skill) => (
-            <span
-              key={skill}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border ${accent.chip}`}
-            >
-              <Sparkles className="w-3 h-3 opacity-60" />
-              {skill}
-            </span>
-          ))}
-          {extraSkills > 0 ? (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] text-slate-500 bg-slate-50 border border-slate-200">
-              +{extraSkills} compétence{extraSkills > 1 ? 's' : ''}
-            </span>
-          ) : null}
-        </div>
+        {visibleSkills.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5 min-w-0">
+            {visibleSkills.map((skill) => (
+              <span
+                key={skill}
+                className={`inline-flex max-w-full items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border break-words ${accent.chip}`}
+              >
+                <Sparkles className="w-3 h-3 opacity-60 shrink-0" />
+                <span className="truncate">{skill}</span>
+              </span>
+            ))}
+            {extraSkills > 0 ? (
+              <span className="inline-flex items-center px-2 py-1 rounded-lg text-[11px] text-slate-500 bg-slate-50 border border-slate-200">
+                +{extraSkills}
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400 italic">Aucune compétence renseignée</p>
+        )}
       </div>
 
-      <div className="px-5 sm:px-6 py-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs">
-        <span className="text-slate-500 inline-flex items-center gap-1.5">
-          <Briefcase className="w-3.5 h-3.5" />
+      <div className="px-4 sm:px-5 py-3 bg-slate-50/80 border-t border-slate-100 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between shrink-0">
+        <span className="text-xs text-slate-500 inline-flex items-center gap-1.5">
+          <Briefcase className="w-3.5 h-3.5 shrink-0" />
           {position.competencies.length} compétence{position.competencies.length > 1 ? 's' : ''}
         </span>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="font-medium text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1"
-        >
-          <Pencil className="w-3.5 h-3.5" />
-          Modifier
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors"
+          >
+            <SquarePen className="w-3.5 h-3.5 shrink-0" />
+            Modifier
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="inline-flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-red-200 bg-white text-red-700 hover:bg-red-50 hover:border-red-300 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5 shrink-0" />
+            Supprimer
+          </button>
+        </div>
       </div>
     </article>
   );

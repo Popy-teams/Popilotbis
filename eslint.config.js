@@ -15,6 +15,8 @@ export default tseslint.config(
       'test-results/**',
       'src/app/supabase/**',
       'UserControlled/**',
+      'src/vendor/**/*.js',
+      'doc/**',
     ],
   },
   js.configs.recommended,
@@ -36,6 +38,12 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       'no-empty': ['error', { allowEmptyCatch: true }],
       'react-hooks/rules-of-hooks': 'warn',
+    },
+  },
+  {
+    files: ['src/vendor/*Loader.ts'],
+    rules: {
+      '@typescript-eslint/ban-ts-comment': 'off',
     },
   },
   {

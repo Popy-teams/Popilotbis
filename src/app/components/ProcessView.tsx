@@ -26,6 +26,7 @@ import { PageBackHeader } from './shared/PageBackHeader';
 import { TEST_PROCESSES, ProcessData } from '../data/testProcesses';
 import { ViewShell, ViewHeader, AppIcon, ActionButton } from './shared';
 import { ProcessFormPage } from './process/ProcessFormPage';
+import { ProcessMapCard } from './process/ProcessMapCard';
 
 type PageMode = 'list' | 'create' | 'view' | 'edit';
 
@@ -76,13 +77,13 @@ export function ProcessView() {
   ];
 
   const getColorClasses = (color: string) => {
-    const colors: Record<string, { bg: string; border: string; text: string; hover: string }> = {
-      indigo: { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-900', hover: 'hover:bg-indigo-100' },
-      blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-900', hover: 'hover:bg-blue-100' },
-      green: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-900', hover: 'hover:bg-green-100' },
-      orange: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-900', hover: 'hover:bg-orange-100' },
-      purple: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-900', hover: 'hover:bg-purple-100' },
-      pink: { bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-900', hover: 'hover:bg-pink-100' },
+    const colors: Record<string, { bg: string; border: string; text: string; hover: string; iconBg: string }> = {
+      indigo: { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-900', hover: 'hover:bg-indigo-100', iconBg: 'bg-indigo-600' },
+      blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-900', hover: 'hover:bg-blue-100', iconBg: 'bg-blue-600' },
+      green: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-900', hover: 'hover:bg-green-100', iconBg: 'bg-green-600' },
+      orange: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-900', hover: 'hover:bg-orange-100', iconBg: 'bg-orange-600' },
+      purple: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-900', hover: 'hover:bg-purple-100', iconBg: 'bg-purple-600' },
+      pink: { bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-900', hover: 'hover:bg-pink-100', iconBg: 'bg-pink-600' },
     };
     return colors[color] || colors.indigo;
   };
@@ -203,7 +204,7 @@ export function ProcessView() {
 
         <div className={`rounded-xl border-2 ${getColorClasses(config.color).border} overflow-hidden`}>
           <div className={`${getColorClasses(config.color).bg} p-6 flex items-start gap-4`}>
-            <div className={`w-14 h-14 rounded-lg bg-${config.color}-600 flex items-center justify-center shrink-0`}>
+            <div className={`w-14 h-14 rounded-lg ${getColorClasses(config.color).iconBg} flex items-center justify-center shrink-0`}>
               <Icon className="w-8 h-8 text-white" />
             </div>
             <div className="flex-1">
@@ -225,39 +226,7 @@ export function ProcessView() {
                 <ChevronRight className="w-5 h-5 text-indigo-600" />
                 Carte du processus
               </h3>
-              <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                  {process.steps.map((step, index) => (
-                    <div key={step.id} className="flex items-center shrink-0">
-                      <div
-                        className={`flex flex-col items-center p-4 rounded-lg border-2 min-w-[120px] ${
-                          step.status === 'done'
-                            ? 'border-green-300 bg-green-50'
-                            : step.status === 'in-progress'
-                            ? 'border-blue-300 bg-blue-50'
-                            : 'border-gray-300 bg-white'
-                        }`}
-                      >
-                        <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center font-bold mb-2 ${
-                            step.status === 'done'
-                              ? 'bg-green-600 text-white'
-                              : step.status === 'in-progress'
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-gray-300 text-gray-700'
-                          }`}
-                        >
-                          {index + 1}
-                        </div>
-                        <div className="text-xs font-semibold text-center text-gray-900 line-clamp-2">{step.title}</div>
-                      </div>
-                      {index < process.steps.length - 1 && (
-                        <ChevronRight className="w-6 h-6 text-gray-400 mx-1 shrink-0" />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <ProcessMapCard steps={process.steps} />
             </div>
 
             <div className="grid lg:grid-cols-2 gap-6">

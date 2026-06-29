@@ -67,8 +67,8 @@ export function VeilleView() {
   }, [entries]);
 
   const scopedEntries = useMemo(
-    () => filterByActiveProject(entries, matchesProject),
-    [entries, matchesProject]
+    () => filterByActiveProject(entries, matchesProject, activeProjectSlug ?? 'popy'),
+    [entries, matchesProject, activeProjectSlug]
   );
 
   const stats = useMemo(() => computeVeilleStats(scopedEntries), [scopedEntries]);

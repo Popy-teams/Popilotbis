@@ -19,7 +19,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { ProcessData } from '../../data/testProcesses';
 import { TEST_TEAM_MEMBERS, getTasksByProject } from '../../data/testData';
 import { PageBackHeader } from '../shared/PageBackHeader';
-import { ViewShell, FormSelect } from '../shared';
+import { ViewShell, FormSelect, LineItemsEditor, normalizeLineItems } from '../shared';
 
 type ProcessStep = ProcessData['steps'][number];
 type ProcessType = ProcessData['type'];
@@ -38,12 +38,8 @@ const PROCESS_TYPES: {
   { value: 'indicateurs', label: 'Indicateurs de suivi', subtitle: 'MESURER', icon: Activity },
 ];
 
-function linesToArray(value: string) {
-  return value.split('\n').map((l) => l.trim()).filter(Boolean);
-}
-
-function arrayToLines(values?: string[]) {
-  return values?.join('\n') ?? '';
+function toLineItems(values?: string[]) {
+  return values?.length ? [...values] : [];
 }
 
 function calcProgress(steps: ProcessStep[]) {
@@ -85,10 +81,10 @@ export function ProcessFormPage({
     objective: initial?.objective ?? '',
     trigger: initial?.trigger ?? '',
     responsible: initial?.responsible ?? '',
-    contributors: arrayToLines(initial?.contributors),
-    deliverables: arrayToLines(initial?.deliverables),
-    validationCriteria: arrayToLines(initial?.validationCriteria),
-    risks: arrayToLines(initial?.risks),
+    contributors: toLineItems(initial?.contributors),
+    deliverables: toLineItems(initial?.deliverables),
+    validationCriteria: toLineItems(initial?.validationCriteria),
+    risks: toLineItems(initial?.risks),
     improvementLink: initial?.improvementLink ?? '',
   });
 
@@ -183,11 +179,11 @@ export function ProcessFormPage({
       objective: form.objective.trim(),
       trigger: form.trigger.trim() || undefined,
       responsible: form.responsible.trim(),
-      contributors: linesToArray(form.contributors),
+      contributors: normalizeLineItems(form.contributors),
       steps: validSteps,
-      deliverables: linesToArray(form.deliverables),
-      validationCriteria: linesToArray(form.validationCriteria),
-      risks: linesToArray(form.risks),
+      deliverables: normalizeLineItems(form.deliverables),
+      validationCriteria: normalizeLineItems(form.validationCriteria),
+      risks: normalizeLineItems(form.risks),
       improvementLink: form.improvementLink.trim() || undefined,
       assignedTo: assignedMembers,
       linkedTasks,
@@ -290,13 +286,14 @@ export function ProcessFormPage({
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Contributeurs (un par ligne)</label>
-            <textarea
-              rows={2}
-              value={form.contributors}
-              onChange={(e) => setForm({ ...form, contributors: e.target.value })}
-              placeholder="Fabio Garcia&#10;Sonia Laurent"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+            <LineItemsEditor
+              label="Contributeurs"
+              hint="Personnes impliquées en soutien du responsable."
+              items={form.contributors}
+              onChange={(contributors) => setForm({ ...form, contributors })}
+              placeholder="Ex. Sonia Laurent"
+              addLabel="Ajouter un contributeur"
+              emptyLabel="Ajouter un contributeur"
             />
           </div>
         </section>
@@ -435,35 +432,34 @@ export function ProcessFormPage({
           </div>
         </section>
 
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Livrables (un par ligne)</label>
-            <textarea
-              rows={3}
-              value={form.deliverables}
-              onChange={(e) => setForm({ ...form, deliverables: e.target.value })}
-              placeholder="Document de vision&#10;Rapport de tests"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Critères de validation (un par ligne)</label>
-            <textarea
-              rows={3}
-              value={form.validationCriteria}
-              onChange={(e) => setForm({ ...form, validationCriteria: e.target.value })}
-              placeholder="Validation PO&#10;Tests réussis"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
-            />
-          </div>
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <LineItemsEditor
+            label="Livrables"
+            hint="Documents, artefacts ou résultats attendus à la fin du processus."
+            items={form.deliverables}
+            onChange={(deliverables) => setForm({ ...form, deliverables })}
+            placeholder="Ex. Document de vision produit"
+            addLabel="Ajouter un livrable"
+            emptyLabel="Ajouter un livrable"
+          />
+          <LineItemsEditor
+            label="Critères de validation"
+            hint="Conditions à remplir pour considérer le processus comme validé."
+            items={form.validationCriteria}
+            onChange={(validationCriteria) => setForm({ ...form, validationCriteria })}
+            placeholder="Ex. Validation du PO"
+            addLabel="Ajouter un critère"
+            emptyLabel="Ajouter un critère"
+          />
           <div className="md:col-span-2">
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Risques identifiés (un par ligne)</label>
-            <textarea
-              rows={2}
-              value={form.risks}
-              onChange={(e) => setForm({ ...form, risks: e.target.value })}
-              placeholder="Retard sur les livraisons&#10;Complexité sous-estimée"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+            <LineItemsEditor
+              label="Risques identifiés"
+              hint="Menaces ou points de vigilance liés à ce processus."
+              items={form.risks}
+              onChange={(risks) => setForm({ ...form, risks })}
+              placeholder="Ex. Retard sur les livraisons"
+              addLabel="Ajouter un risque"
+              emptyLabel="Ajouter un risque"
             />
           </div>
         </section>

@@ -25,9 +25,7 @@ import {
 } from './kpi/kpiPresentation';
 
 export function KPIView() {
-  const { activeProject, matchesProject } = useProjectContext();
-  const showKpis = matchesProject('popy');
-
+  const { activeProject, matchesProject, activeProjectSlug } = useProjectContext();
   const [activeTab, setActiveTab] = useState<KpiTab>('overview');
   const [activeCategoryId, setActiveCategoryId] = useState<KpiCategoryId | null>(null);
   const [pageMode, setPageMode] = useState<KpiPageMode>('list');
@@ -66,8 +64,8 @@ export function KPIView() {
   }, [metrics]);
 
   const scopedMetrics = useMemo(
-    () => filterByActiveProject(metrics, matchesProject),
-    [metrics, matchesProject]
+    () => filterByActiveProject(metrics, matchesProject, activeProjectSlug ?? 'popy'),
+    [metrics, matchesProject, activeProjectSlug]
   );
 
   const stats = useMemo(() => computeKpiStats(scopedMetrics), [scopedMetrics]);
@@ -148,24 +146,21 @@ export function KPIView() {
           title="Tableau de bord KPI"
           subtitle={
             activeProject
-              ? `${activeProject.name} — Référentiel POPY · ${stats.total} indicateurs`
-              : 'Sélectionnez un projet — Référentiel POPY'
+              ? `${activeProject.name} — ${stats.total} indicateur${stats.total > 1 ? 's' : ''}`
+              : 'Sélectionnez un projet'
           }
           badge="Indicateurs · KPI"
           theme="amber"
           actions={
-            showKpis ? (
-              <ActionButton icon={Plus} onClick={openCreate}>
-                Nouveau KPI
-              </ActionButton>
-            ) : undefined
+            <ActionButton icon={Plus} onClick={openCreate}>
+              Nouveau KPI
+            </ActionButton>
           }
         />
 
-        {!showKpis ? (
+        {scopedMetrics.length === 0 ? (
           <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 p-8 text-center text-stone-600">
-            Aucun indicateur KPI configuré pour ce projet. Le référentiel complet ({FULL_KPI_FIXTURES.length}{' '}
-            indicateurs) est lié au projet POPY.
+            Aucun indicateur KPI pour ce projet. Créez un premier KPI ou sélectionnez un autre projet.
           </div>
         ) : (
           <div className="space-y-4 sm:space-y-5 min-w-0 overflow-x-hidden">

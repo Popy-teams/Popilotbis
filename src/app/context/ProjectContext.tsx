@@ -42,8 +42,9 @@ interface ProjectContextValue {
 const ProjectContext = createContext<ProjectContextValue | null>(null);
 
 function normalizeProject(p: Project): Project {
-  const participantIds =
-    p.participantIds?.length
+  const participantIds = p.isRestricted
+    ? (p.participantIds ?? [])
+    : p.participantIds?.length
       ? p.participantIds
       : PORTFOLIO_MEMBERS.map((m) => m.id);
 

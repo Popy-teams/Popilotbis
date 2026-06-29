@@ -48,6 +48,7 @@ interface ProjectFormPageProps {
   values: ProjectFormValues;
   members: MemberOption[];
   submitLabel: string;
+  submitError?: string;
   progress?: number;
   onBack: () => void;
   onChange: (values: ProjectFormValues) => void;
@@ -65,6 +66,7 @@ export function ProjectFormPage({
   values,
   members,
   submitLabel,
+  submitError,
   progress = 0,
   onBack,
   onChange,
@@ -89,7 +91,15 @@ export function ProjectFormPage({
     <ViewShell>
       <PageBackHeader title={title} subtitle={subtitle} onBack={onBack} />
 
-      <form onSubmit={onSubmit} className="space-y-6">
+      <form onSubmit={onSubmit} noValidate className="space-y-6">
+        {submitError ? (
+          <div
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          >
+            {submitError}
+          </div>
+        ) : null}
         {/* Statut automatique */}
         {previewStatus && (
           <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 sm:p-5 shadow-sm">
@@ -216,7 +226,7 @@ export function ProjectFormPage({
             </div>
             <div className="md:col-span-2">
               <label className={labelClass} htmlFor="project-budget">
-                Budget total (EUR) *
+                Budget total (EUR)
               </label>
               <div className="relative">
                 <AppIcon
@@ -227,12 +237,12 @@ export function ProjectFormPage({
                 <input
                   id="project-budget"
                   type="number"
-                  required
                   min="0"
+                  step="1"
                   value={values.budgetTotal}
                   onChange={(e) => onChange({ ...values, budgetTotal: e.target.value })}
                   className={`${inputClass} pl-10`}
-                  placeholder="120000"
+                  placeholder="0"
                 />
               </div>
             </div>

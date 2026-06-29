@@ -101,8 +101,8 @@ export function MarketingStrategyView() {
   }, [phases, projectId, ready]);
 
   const scopedActions = useMemo(
-    () => filterByActiveProject(actions, matchesProject),
-    [actions, matchesProject]
+    () => filterByActiveProject(actions, matchesProject, activeProjectSlug ?? 'popy'),
+    [actions, matchesProject, activeProjectSlug]
   );
 
   const filteredActions = useMemo(() => {

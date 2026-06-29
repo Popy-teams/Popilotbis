@@ -115,7 +115,7 @@ async function compressImage(file: File): Promise<string> {
     throw new Error('Dimensions image invalides');
   }
 
-  let scale = Math.min(1, MAX_DIMENSION / Math.max(width, height));
+  const scale = Math.min(1, MAX_DIMENSION / Math.max(width, height));
   width = Math.max(1, Math.round(width * scale));
   height = Math.max(1, Math.round(height * scale));
 

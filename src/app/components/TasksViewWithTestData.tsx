@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { TEST_TASKS, TEST_TEAM_MEMBERS, type TestTask } from '../data/testData';
 import { MEETING_DEMO_TASKS } from '../data/meetingDemoData';
@@ -13,6 +13,7 @@ import {
   removeTaskFromPipeline,
 } from '../utils/pipelineSync';
 import { getRoutePath } from '../routes/viewRoutes';
+import { filterByActiveProject } from '../utils/projectMatch';
 import { getLinkedProcessesForTask } from '../data/testProcesses';
 import { ViewShell, ViewHeader } from './shared';
 import {
@@ -57,7 +58,10 @@ export function TasksViewWithTestData() {
     };
   }, []);
 
-  const projectTasks = tasks.filter((t) => matchesProject(t.projectId));
+  const projectTasks = useMemo(
+    () => filterByActiveProject(tasks, matchesProject, activeProjectSlug ?? 'popy'),
+    [tasks, matchesProject, activeProjectSlug]
+  );
 
   const persistTasks = (nextTasks: TestTask[]) => {
     try {

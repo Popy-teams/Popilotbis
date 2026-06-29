@@ -28,10 +28,14 @@ export function entityMatchesProject(
 
 export type WithOptionalProjectId = { projectId?: string };
 
+/**
+ * Filtre les entités par projet actif.
+ * @param untaggedAs — référence projet pour les éléments sans projectId (souvent le slug du projet actif)
+ */
 export function filterByActiveProject<T extends WithOptionalProjectId>(
   items: T[],
   matchesProject: (ref?: string) => boolean,
-  legacyDefault = 'popy'
+  untaggedAs = 'popy'
 ): T[] {
-  return items.filter((item) => matchesProject(item.projectId ?? legacyDefault));
+  return items.filter((item) => matchesProject(item.projectId ?? untaggedAs));
 }

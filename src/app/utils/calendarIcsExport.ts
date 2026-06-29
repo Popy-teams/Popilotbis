@@ -65,7 +65,7 @@ export function downloadIcsEvent(event: CalendarEvent): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${event.title.replace(/[^\w\-]+/g, '_').slice(0, 40)}.ics`;
+  a.download = `${event.title.replace(/[^\w-]+/g, '_').slice(0, 40)}.ics`;
   a.click();
   URL.revokeObjectURL(url);
 }
