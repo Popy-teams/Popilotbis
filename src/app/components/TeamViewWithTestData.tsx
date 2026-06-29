@@ -64,11 +64,13 @@ import {
   positionToFormValues,
   type PositionFormValues,
 } from './team/PositionFormPage';
-import { AddPositionCategoryModal } from './team/AddPositionCategoryModal';
+import { PositionCategoriesModal } from './team/PositionCategoriesModal';
 import {
   addPositionCategory,
+  DEFAULT_POSITION_CATEGORIES,
   loadPositionCategories,
   mergePositionCategoryLists,
+  removePositionCategory,
 } from '../utils/positionCategoryStore';
 
 import { TEAM_STORAGE_KEY } from '../utils/teamMemberStore';
@@ -228,6 +230,21 @@ export function TeamViewWithTestData() {
   const handleAddPositionCategory = (label: string) => {
     setPositionCategories((prev) => addPositionCategory(label, prev));
     setSelectedPositionCategory(label);
+  };
+
+  const handleRemovePositionCategory = (label: string) => {
+    const key = label.toLowerCase();
+    setPositionCategories((prev) => removePositionCategory(label, prev));
+    if (selectedPositionCategory?.toLowerCase() === key) {
+      setSelectedPositionCategory(null);
+    }
+    setPositionForm((prev) => {
+      if (prev.category.toLowerCase() !== key) return prev;
+      const fallback =
+        allPositionCategories.find((c) => c.toLowerCase() !== key) ??
+        DEFAULT_POSITION_CATEGORIES[0];
+      return { ...prev, category: fallback };
+    });
   };
 
   const buildMember = (values: MemberFormValues, base?: TeamMemberData): TeamMemberData | null => {
@@ -573,7 +590,7 @@ export function TeamViewWithTestData() {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border border-dashed border-violet-300 text-violet-700 bg-violet-50/60 hover:bg-violet-50 transition-colors"
             >
               <FolderPlus className="w-4 h-4 shrink-0" />
-              Catégorie
+              Gérer
             </button>
           </div>
 
@@ -646,10 +663,13 @@ export function TeamViewWithTestData() {
         </>
       )}
       {showCategoryModal ? (
-        <AddPositionCategoryModal
-          existing={allPositionCategories}
+        <PositionCategoriesModal
+          categories={allPositionCategories}
+          positions={positions}
+          members={members}
           onClose={() => setShowCategoryModal(false)}
           onAdd={handleAddPositionCategory}
+          onRemove={handleRemovePositionCategory}
         />
       ) : null}
     </ViewShell>

@@ -9,6 +9,27 @@ Plateforme de pilotage projet avec conformité ISO 9001.
 
 ## Lancer avec Docker
 
+**Prérequis :** [Docker Desktop](https://docs.docker.com/get-docker/) (ou Docker Engine + Compose v2).
+
+### Script rapide (recommandé)
+
+Depuis la racine du dépôt :
+
+```bash
+# macOS / Linux
+chmod +x scripts/start-docker.sh
+./scripts/start-docker.sh
+```
+
+```powershell
+# Windows (PowerShell)
+.\scripts\start-docker.ps1
+```
+
+Le script vérifie Docker, lance `docker compose up --build -d` et affiche les URLs d'accès.
+
+### Commande manuelle
+
 ```bash
 docker compose up --build -d
 ```
@@ -21,6 +42,13 @@ docker compose up --build -d
 | PostgreSQL | `localhost:5432` — db `popilot` / user `popilot` / pass `popilot` |
 
 **Compte démo :** `admin@popilot.com` / `Popilot2026!`
+
+### Arrêter / logs
+
+```bash
+docker compose logs -f    # suivre les logs
+docker compose down       # arrêter les conteneurs
+```
 
 ## Développement local
 
