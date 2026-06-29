@@ -3,6 +3,7 @@ import type { ViewType } from './viewRoutes';
 /** Icônes sidebar — fond pastel + teinte (toujours visible) */
 export const NAV_ICON_THEMES: Record<ViewType, { wrap: string; icon: string; indicator?: string }> = {
   'my-dashboard': { wrap: 'bg-sky-100 border-sky-200', icon: 'text-sky-700', indicator: '#0284c7' },
+  'personal-space': { wrap: 'bg-blue-100 border-blue-200', icon: 'text-blue-800', indicator: '#1d4ed8' },
   dashboard: { wrap: 'bg-indigo-100 border-indigo-200', icon: 'text-indigo-700', indicator: '#4f46e5' },
   projects: { wrap: 'bg-violet-100 border-violet-200', icon: 'text-violet-700', indicator: '#7c3aed' },
   process: { wrap: 'bg-orange-100 border-orange-200', icon: 'text-orange-700', indicator: '#ea580c' },

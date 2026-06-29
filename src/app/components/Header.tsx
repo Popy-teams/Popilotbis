@@ -1,9 +1,9 @@
 import { Bell, ChevronDown, FolderKanban, LogOut, Menu } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import type { AuthUser } from '../auth/authApi';
 import { useAuth } from '../auth/AuthContext';
 import { useProjectContext } from '../context/ProjectContext';
-import { LOGIN_PATH } from '../routes/viewRoutes';
+import { getRoutePath, LOGIN_PATH } from '../routes/viewRoutes';
 import { AppIcon } from './shared/icons';
 import { IconButton } from './shared/IconButton';
 import { SearchField } from './shared/SearchField';
@@ -75,7 +75,13 @@ export function Header({ user, onMenuClick }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-auto">
-          <span className="hidden md:inline text-sm text-stone-600 truncate max-w-[8rem]">{user.name}</span>
+          <Link
+            to={`/${getRoutePath('personal-space')}`}
+            className="hidden md:inline text-sm text-stone-600 truncate max-w-[8rem] hover:text-sky-700 hover:underline underline-offset-2 transition-colors"
+            title="Mon espace personnel"
+          >
+            {user.name}
+          </Link>
           <div className="relative">
             <IconButton icon={Bell} label="Notifications" className="text-slate-600" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full pointer-events-none" />

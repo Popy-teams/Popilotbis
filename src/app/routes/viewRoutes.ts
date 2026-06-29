@@ -8,6 +8,7 @@ import {
   DollarSign,
   Shield,
   User,
+  UserCircle,
   Rocket,
   Package,
   BookOpen,
@@ -23,6 +24,7 @@ import {
 
 export type ViewType =
   | 'my-dashboard'
+  | 'personal-space'
   | 'dashboard'
   | 'projects'
   | 'tasks'
@@ -55,6 +57,7 @@ export interface AppRouteConfig {
 /** Routes applicatives (chemins relatifs au layout authentifié). */
 export const APP_ROUTES: AppRouteConfig[] = [
   { id: 'my-dashboard', path: 'mon-tableau-de-bord', label: 'Mon tableau de bord', icon: User, section: 'personal' },
+  { id: 'personal-space', path: 'espace-personnel', label: 'Mes informations', icon: UserCircle, section: 'personal' },
   { id: 'dashboard', path: 'vue-ensemble', label: "Vue d'ensemble", icon: LayoutDashboard, section: 'management' },
   { id: 'projects', path: 'portfolio-projets', label: 'Portfolio projets', icon: FolderKanban, section: 'management' },
   { id: 'process', path: 'processus', label: 'Approche processus', icon: Rocket, section: 'management' },

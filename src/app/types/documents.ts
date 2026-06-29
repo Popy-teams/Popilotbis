@@ -1,10 +1,21 @@
 // Types pour la documentation ISO 9001 et études structurantes
 
+export interface DocumentAttachment {
+  fileName: string;
+  mimeType: string;
+  size: number;
+  /** Contenu encodé base64 (data URL) pour prévisualisation locale */
+  dataUrl?: string;
+  /** Texte brut / markdown saisi ou extrait */
+  textContent?: string;
+}
+
 export interface ISODocument {
   id: string;
   title: string;
   type: ISODocumentType;
-  category: DocumentCategory;
+  /** Identifiant de catégorie (built-in ou personnalisée) */
+  category: string;
   status: 'draft' | 'validated' | 'obsolete';
   responsible: string;
   responsibleName?: string;
@@ -13,6 +24,8 @@ export interface ISODocument {
   description?: string;
   content?: string;
   fileUrl?: string;
+  file?: DocumentAttachment;
+  customTypeLabel?: string;
   createdAt: string;
   updatedAt: string;
   validatedBy?: string;
@@ -29,7 +42,16 @@ export interface ISODocument {
     objectiveIds?: string[];
   };
   tags?: string[];
-  isCritical?: boolean; // Bloque le passage à l'étape suivante si absent
+  isCritical?: boolean;
+}
+
+export interface DocumentCategoryDef {
+  id: string;
+  label: string;
+  description?: string;
+  color: string;
+  isBuiltin?: boolean;
+  projectId?: string;
 }
 
 export type DocumentCategory =
@@ -84,7 +106,8 @@ export type ISODocumentType =
   // RH
   | 'plan-recrutement'
   | 'gestion-competences'
-  | 'plan-formation';
+  | 'plan-formation'
+  | 'autre';
 
 export interface DocumentVersion {
   version: string;
@@ -187,7 +210,12 @@ export const ISO_REQUIREMENTS: ISOCompliance[] = [
   },
 ];
 
-export function getDocumentCategoryLabel(category: DocumentCategory): string {
+export function getDocumentCategoryLabel(
+  category: string,
+  categories?: DocumentCategoryDef[]
+): string {
+  const custom = categories?.find((c) => c.id === category);
+  if (custom) return custom.label;
   const labels: Record<DocumentCategory, string> = {
     feasibility: 'Études & Faisabilité',
     conception: 'Conception',
@@ -197,10 +225,11 @@ export function getDocumentCategoryLabel(category: DocumentCategory): string {
     quality: 'Qualité',
     pilotage: 'Pilotage',
   };
-  return labels[category];
+  return labels[category as DocumentCategory] ?? category;
 }
 
-export function getDocumentTypeLabel(type: ISODocumentType): string {
+export function getDocumentTypeLabel(type: ISODocumentType, customLabel?: string): string {
+  if (type === 'autre' && customLabel?.trim()) return customLabel.trim();
   const labels: Record<ISODocumentType, string> = {
     // Qualité & Pilotage
     'politique-qualite': 'Politique qualité',
@@ -245,6 +274,7 @@ export function getDocumentTypeLabel(type: ISODocumentType): string {
     'plan-recrutement': 'Plan de recrutement',
     'gestion-competences': 'Gestion des compétences',
     'plan-formation': 'Plan de formation',
+    autre: 'Autre document',
   };
   return labels[type];
 }
@@ -294,6 +324,7 @@ export function getDocumentTypeColor(type: ISODocumentType): string {
     'plan-recrutement': 'bg-amber-100 text-amber-800',
     'gestion-competences': 'bg-orange-100 text-orange-800',
     'plan-formation': 'bg-yellow-100 text-yellow-800',
+    autre: 'bg-stone-100 text-stone-800',
   };
   return colors[type];
 }

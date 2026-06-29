@@ -1,5 +1,9 @@
 import { useState, useMemo } from 'react';
+import { Link } from 'react-router';
+import { useAuth } from '../auth/AuthContext';
 import { useProjectContext } from '../context/ProjectContext';
+import { getRoutePath } from '../routes/viewRoutes';
+import { loadPersonalProfile, getDisplayName } from '../data/personalProfileStore';
 import {
   Target,
   CheckCircle,
@@ -30,7 +34,10 @@ const TROPHY_ICONS: Record<string, typeof Crown> = {
 };
 
 export function MyDashboard() {
+  const { user } = useAuth();
   const { activeProject, matchesProject } = useProjectContext();
+  const profile = useMemo(() => loadPersonalProfile(user), [user]);
+  const displayName = getDisplayName(profile) || user.name;
   const [pageMode, setPageMode] = useState<PageMode>('dashboard');
   const [blockageForm, setBlockageForm] = useState({
     taskId: '',
@@ -47,8 +54,8 @@ export function MyDashboard() {
   ];
 
   const myData = {
-    name: 'Jean Dupont',
-    role: 'Chef de projet',
+    name: displayName,
+    role: profile.jobTitle || 'Chef de projet',
     workload: 85,
     myTasks: [
       {
@@ -364,6 +371,14 @@ export function MyDashboard() {
         badge="Mon espace · Personnel"
         badgeIcon={Hand}
         theme="blue"
+        actions={
+          <Link
+            to={`/${getRoutePath('personal-space')}`}
+            className="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-white/90 border border-sky-200 text-sky-800 text-sm font-semibold hover:bg-white transition-colors shadow-sm"
+          >
+            Mes informations
+          </Link>
+        }
       />
 
       <ViewStatsGrid cols={4}>

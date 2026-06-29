@@ -18,10 +18,12 @@ import { SatisfactionView } from '../components/SatisfactionView';
 import { AuditView } from '../components/AuditView';
 import { KPIView } from '../components/KPIView';
 import { PdcaView } from '../components/pdca/PdcaView';
+import { PersonalSpaceView } from '../features/personal/PersonalSpaceView';
 import type { ViewType } from './viewRoutes';
 
 export const VIEW_ELEMENTS: Record<ViewType, ReactNode> = {
   'my-dashboard': <MyDashboard />,
+  'personal-space': <PersonalSpaceView />,
   dashboard: <Dashboard />,
   projects: <ProjectsFeature />,
   process: <ProcessView />,
