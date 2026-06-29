@@ -1,6 +1,6 @@
 import { TEST_TASKS } from '../data/testData';
 import { INITIAL_PIPELINE } from '../data/initialPipeline';
-import { INITIAL_DOCUMENTS } from '../components/DocumentationView';
+import { INITIAL_DOCUMENTS } from '../data/documentationDemoData';
 import {
   DEMO_ALERTS_BY_PROJECT,
   DEMO_BOM_BY_PROJECT,

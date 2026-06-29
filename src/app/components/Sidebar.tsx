@@ -2,7 +2,7 @@ import { NavLink } from 'react-router';
 import { ChevronRight, X } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import type { AuthUser } from '../auth/authApi';
-import { APP_ROUTES, type NavSection } from '../routes/viewRoutes';
+import { APP_ROUTES, getRoutePath, type NavSection } from '../routes/viewRoutes';
 import { NAV_ICON_THEMES } from '../routes/navIconThemes';
 import { AppIcon } from './shared/icons';
 import { cn } from './ui/utils';
@@ -123,7 +123,12 @@ export function Sidebar({ user, onNavigate, open = false, onClose }: SidebarProp
         </nav>
 
         <footer className="app-sidebar__footer">
-          <div className="app-sidebar__user">
+          <NavLink
+            to={`/${getRoutePath('personal-space')}`}
+            onClick={onNavigate}
+            className="app-sidebar__user hover:bg-white/10 rounded-xl transition-colors"
+            title="Mon espace personnel"
+          >
             <div className="app-sidebar__avatar">
               <span className="app-sidebar__avatar-inner">
                 <UserInitials name={user.name} />
@@ -133,7 +138,7 @@ export function Sidebar({ user, onNavigate, open = false, onClose }: SidebarProp
               <div className="app-sidebar__user-name">{user.name}</div>
               <div className="app-sidebar__user-role">{user.role}</div>
             </div>
-          </div>
+          </NavLink>
         </footer>
       </div>
     </aside>
