@@ -1,0 +1,29 @@
+name: Déploiement (CD)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}      # bouton manuel de secours dans l'onglet Actions
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false  # on ne coupe jamais un déploiement en cours
+
+jobs:
+  deploy:
+    name: Déployer sur le serveur
+    runs-on: ubuntu-latest
+    steps:
+      - name: Déploiement SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/Popilotbis
+            git fetch --all
+            git reset --hard origin/main
+            docker compose up -d --build
+            docker image prune -f
