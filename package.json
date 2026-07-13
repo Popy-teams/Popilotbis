@@ -109,7 +109,7 @@
     "react-hook-form@7.55.0": "npm:react-hook-form@7.55.0",
     "react-popper": "2.3.0",
     "react-popper@2.3.0": "npm:react-popper@2.3.0",
-    "react-resizable-panels": "2.1.7",
+    "react-resizable-panels": "4.12.2",
     "react-resizable-panels@2.1.7": "npm:react-resizable-panels@2.1.7",
     "react-responsive-masonry": "2.7.1",
     "react-responsive-masonry@2.7.1": "npm:react-responsive-masonry@2.7.1",
