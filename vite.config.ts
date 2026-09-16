@@ -16,9 +16,28 @@ function figmaAssetResolver() {
   }
 }
 
+// Le bundle vendored xlsx-style contient un `require("./cpexcel.js")` (tables de
+// codepages) qui n'existe pas et n'est jamais exécuté côté navigateur. Vite 8
+// (rolldown) échoue à le résoudre au build → on le remplace par un module vide.
+function stubXlsxCpexcel() {
+  const STUB_ID = '\0xlsx-cpexcel-stub'
+  return {
+    name: 'stub-xlsx-cpexcel',
+    resolveId(id) {
+      if (id === 'cpexcel.js' || id.endsWith('/cpexcel.js') || id === './cpexcel.js') {
+        return STUB_ID
+      }
+    },
+    load(id) {
+      if (id === STUB_ID) return 'export default {}'
+    },
+  }
+}
+
 export default defineConfig({
   plugins: [
     figmaAssetResolver(),
+    stubXlsxCpexcel(),
     react(),
     tailwindcss(),
   ],
