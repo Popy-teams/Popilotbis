@@ -85,7 +85,7 @@ export function ProjectsFeature() {
   const sortedProjects = useMemo(() => {
     const arr = [...projectsWithStatus];
     arr.sort((a, b) => {
-      let cmp = 0;
+      let cmp: number;
       if (sortKey === 'deadline') {
         cmp = new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
       } else if (sortKey === 'progress') {

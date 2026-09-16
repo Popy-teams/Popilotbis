@@ -38,6 +38,13 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       'no-empty': ['error', { allowEmptyCatch: true }],
       'react-hooks/rules-of-hooks': 'warn',
+      // Règles React Compiler (eslint-plugin-react-hooks v7) : passées en warn.
+      // Dette technique à résorber progressivement, mais elles ne doivent pas
+      // bloquer la CI d'un coup après la montée de version.
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/purity': 'warn',
+      'react-hooks/static-components': 'warn',
+      'react-hooks/preserve-manual-memoization': 'warn',
     },
   },
   {
