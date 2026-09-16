@@ -1,5 +1,6 @@
 services:
   app:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile
@@ -19,6 +20,7 @@ services:
         condition: service_healthy
 
   api:
+    restart: unless-stopped
     build:
       context: ./server
       dockerfile: Dockerfile
@@ -42,6 +44,7 @@ services:
 
   mailhog:
     image: mailhog/mailhog:latest
+    restart: unless-stopped
     ports:
       - "8025:8025"
       - "1025:1025"
