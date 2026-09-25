@@ -11,19 +11,30 @@ concurrency:
 
 jobs:
   deploy:
-    name: Déployer sur le serveur
+    name: Déployer sur le homelab
     runs-on: ubuntu-latest
     steps:
-      - name: Déploiement SSH
-        uses: appleboy/ssh-action@v1.2.5
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            set -e
-            cd ~/Popilotbis
-            git fetch --all
-            git reset --hard origin/main
-            docker compose up -d --build
-            docker image prune -f
+      - name: Installer cloudflared
+        run: |
+          sudo mkdir -p --mode=0755 /usr/share/keyrings
+          curl -fsSL https://pkg.cloudflare.com/cloudflare-public-v2.gpg | sudo tee /usr/share/keyrings/cloudflare-public-v2.gpg >/dev/null
+          echo 'deb [signed-by=/usr/share/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
+          sudo apt-get update && sudo apt-get install -y cloudflared
+
+      - name: Préparer la clé SSH
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+
+      - name: Déployer sur la VM via Cloudflare Access
+        env:
+          CF_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new \
+              -o IdentitiesOnly=yes \
+              -i ~/.ssh/id_deploy \
+              -o ProxyCommand="cloudflared access ssh --hostname %h --service-token-id $CF_ID --service-token-secret $CF_SECRET" \
+              pierre@ssh.popilot.dev \
+              'set -e; cd ~/Popilotbis && git fetch --all && git reset --hard origin/main && docker compose up -d --build && docker image prune -f'
