@@ -99,8 +99,8 @@ export function formatBudget(amount: number) {
 const DEFAULT_BUDGET = { total: 0, used: 0, committed: 0 };
 
 /** Budget normalisé — évite les crashs si données API incomplètes */
-export function getProjectBudget(project: Pick<Project, 'budget'> | Partial<Project>) {
-  const budget = project.budget ?? DEFAULT_BUDGET;
+export function getProjectBudget(project?: Pick<Project, 'budget'> | Partial<Project>) {
+  const budget = project?.budget ?? DEFAULT_BUDGET;
   return {
     total: budget.total ?? 0,
     used: budget.used ?? 0,

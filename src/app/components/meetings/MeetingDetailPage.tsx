@@ -77,16 +77,14 @@ export function MeetingDetailPage({
             {meeting.hasReport && (
               <ExportMeetingReportPdfButton meeting={meeting} variant="primary" />
             )}
-            {meeting.status !== 'completed' && (
-              <button
-                type="button"
-                onClick={onReport}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm"
-              >
-                <Edit className="w-4 h-4" />
-                Rédiger CR
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={onReport}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm"
+            >
+              <Edit className="w-4 h-4" />
+              {meeting.hasReport ? 'Modifier CR' : 'Rédiger CR'}
+            </button>
             <button
               type="button"
               onClick={onEdit}

@@ -4,7 +4,7 @@ import { useProjectContext } from '../../context/ProjectContext';
 import { filterByActiveProject } from '../../utils/projectMatch';
 import { DEMO_ALERTS_BY_PROJECT } from '../../data/multiProjectDemoFixtures';
 import { mergeDemoData } from '../../utils/demoDataMerge';
-import { TASKS_STORAGE_KEY } from '../../utils/pipelineSync';
+import { useApi, apiPost, apiPut, apiDelete } from '../../hooks/useApi';
 import type { TestTask } from '../../data/testData';
 import type {
   ProjectDashboardAlert,
@@ -35,46 +35,31 @@ export function ProjectDashboardFeature() {
   const [activeTab, setActiveTab] = useState<ProjectDashboardTab>('overview');
   const [pageMode, setPageMode] = useState<ProjectDashboardPageMode>('list');
   const [quickAction, setQuickAction] = useState<QuickActionKind>('project');
-  const [alerts, setAlerts] = useState<ProjectDashboardAlert[]>(DEFAULT_ALERTS);
   const [selectedAlert, setSelectedAlert] = useState<ProjectDashboardAlert | null>(null);
   const [alertForm, setAlertForm] = useState(emptyAlertForm());
   const [tasksInProgress, setTasksInProgress] = useState(0);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(ALERTS_STORAGE_KEY);
-      if (raw) {
-        setAlerts(mergeDemoData(JSON.parse(raw) as ProjectDashboardAlert[], DEMO_ALERTS_BY_PROJECT));
-      } else {
-        setAlerts((prev) => mergeDemoData(prev, DEMO_ALERTS_BY_PROJECT));
-      }
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const { data: apiAlerts, refetch: refetchAlerts } = useApi<any[]>(activeProject ? `/dashboard-alerts/${encodeURIComponent(activeProject.id)}` : null);
+  const { data: apiTasks } = useApi<any[]>('/tasks');
+
+  const alerts = useMemo(() => {
+    if (!apiAlerts) return [];
+    return apiAlerts.map(a => ({
+      ...a,
+      projectId: a.project_id
+    }));
+  }, [apiAlerts]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(alerts));
-    } catch {
-      /* ignore */
+    if (apiTasks) {
+      const scoped = filterByActiveProject(apiTasks, matchesProject, activeProjectSlug ?? 'popy');
+      setTasksInProgress(scoped.filter((t: any) => t.status === 'in-progress' || t.status === 'blocked').length);
     }
-  }, [alerts]);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(TASKS_STORAGE_KEY);
-      const tasks: TestTask[] = raw ? JSON.parse(raw) : [];
-      const scoped = filterByActiveProject(tasks, matchesProject, activeProjectSlug ?? 'popy');
-      setTasksInProgress(scoped.filter((t) => t.status === 'in-progress' || t.status === 'blocked').length);
-    } catch {
-      setTasksInProgress(0);
-    }
-  }, [matchesProject, activeProjectSlug]);
+  }, [apiTasks, matchesProject, activeProjectSlug]);
 
   const scopedAlerts = useMemo(
-    () => filterByActiveProject(alerts, matchesProject, activeProjectSlug ?? 'popy'),
-    [alerts, matchesProject, activeProjectSlug]
+    () => alerts,
+    [alerts]
   );
 
   const projectWithStatus = useMemo(
@@ -111,24 +96,28 @@ export function ProjectDashboardFeature() {
     setPageMode('edit-alert');
   };
 
-  const submitAlert = (e: React.FormEvent) => {
+  const submitAlert = async (e: React.FormEvent) => {
     e.preventDefault();
     const next = buildAlertFromForm(
       alertForm,
       pageMode === 'edit-alert' ? selectedAlert ?? undefined : undefined,
-      activeProjectSlug ?? 'popy'
+      activeProject?.id ?? 'popy'
     );
+    
     if (pageMode === 'create-alert') {
-      setAlerts((prev) => [...prev, next]);
+      await apiPost('/dashboard-alerts', next);
     } else {
-      setAlerts((prev) => prev.map((a) => (a.id === next.id ? next : a)));
+      await apiPut(`/dashboard-alerts/${next.id}`, next);
     }
+    
+    refetchAlerts();
     goList();
     setActiveTab('alerts');
   };
 
-  const removeAlert = (id: string) => {
-    setAlerts((prev) => prev.filter((a) => a.id !== id));
+  const removeAlert = async (id: string) => {
+    await apiDelete(`/dashboard-alerts/${id}`);
+    refetchAlerts();
   };
 
   const openQuickAction = (kind: QuickActionKind) => {

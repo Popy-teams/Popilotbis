@@ -17,6 +17,7 @@ import {
   Sparkles,
   Filter,
 } from 'lucide-react';
+import { useApi } from '../hooks/useApi';
 import {
   ViewShell,
   ActionButton,
@@ -143,9 +144,61 @@ export function Calendar() {
   const [pageMode, setPageMode] = useState<PageMode | 'list'>('list');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [events, setEvents] = useState<CalendarEvent[]>(DEFAULT_EVENTS);
-  const [ganttItems, setGanttItems] = useState<GanttItem[]>(() => loadGanttItems());
-  const [meetings, setMeetings] = useState(() => loadMeetings());
   const [tasks, setTasks] = useState<TestTask[]>(() => loadTasksForInsights());
+
+  const { data: apiMeetings } = useApi<any[]>(activeProject ? `/meetings?project_id=${encodeURIComponent(activeProject.id)}` : '/meetings');
+  const meetings = useMemo(() => {
+    if (!apiMeetings) return [];
+    return apiMeetings.map((m: any) => ({
+      id: m.id,
+      number: 1,
+      title: m.title,
+      meetingType: m.meeting_type as any,
+      date: new Date(m.date).toISOString().split('T')[0],
+      time: new Date(m.date).toTimeString().substring(0, 5),
+      duration: m.duration,
+      participants: m.participant_ids || [],
+      writerId: m.writer_name || '',
+      writerName: m.writer_name || '',
+      status: m.status as any,
+      hasReport: m.has_report,
+      projectId: m.project_id,
+      projectName: m.project_name || 'Projet',
+      agenda: [],
+      roundTable: [],
+      decisions: m.decisions || [],
+      actions: [],
+      reportData: {
+        notes: m.notes || '',
+        decisions: m.decisions || [],
+        tasksCreated: m.tasks_created || []
+      }
+    }));
+  }, [apiMeetings]);
+
+  const { data: apiGantt } = useApi<any[]>(activeProject ? `/gantt/${activeProject.id}` : null);
+  
+  const ganttItems = useMemo(() => {
+    if (!apiGantt) return [];
+    return apiGantt.map(g => {
+      // Pick a color based on status or provide a default
+      let color = '#6366f1'; // default indigo-500
+      if (g.status === 'completed') color = '#10b981'; // emerald-500
+      else if (g.status === 'in-progress') color = '#f59e0b'; // amber-500
+      
+      return {
+        ...g,
+        projectId: g.project_id,
+        startDate: g.start_date,
+        endDate: g.end_date,
+        parentId: g.parent_id,
+        taskId: g.task_id,
+        meetingId: g.meeting_id,
+        assignee: g.assignee_name || g.assignee,
+        color
+      };
+    });
+  }, [apiGantt]);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [form, setForm] = useState<CalendarEventFormValues>(emptyForm);
 
@@ -171,8 +224,6 @@ export function Calendar() {
 
   const refreshAll = () => {
     reloadEvents();
-    setGanttItems(loadGanttItems());
-    setMeetings(loadMeetings());
     setTasks(loadTasksForInsights());
   };
 
@@ -183,11 +234,9 @@ export function Calendar() {
   useEffect(() => {
     const refresh = () => refreshAll();
     window.addEventListener('popilot:calendar-updated', refresh);
-    window.addEventListener('popilot:gantt-updated', refresh);
     window.addEventListener('popilot:pipeline-updated', refresh);
     return () => {
       window.removeEventListener('popilot:calendar-updated', refresh);
-      window.removeEventListener('popilot:gantt-updated', refresh);
       window.removeEventListener('popilot:pipeline-updated', refresh);
     };
   }, []);
@@ -199,10 +248,19 @@ export function Calendar() {
     } catch {}
   }, [events, pageMode]);
 
-  const scopedEvents = useMemo(
-    () => filterByActiveProject(events, matchesProject, activeProjectSlug ?? 'popy'),
-    [events, matchesProject, activeProjectSlug]
-  );
+  const scopedEvents = useMemo(() => {
+    const localEvents = filterByActiveProject(events, matchesProject, activeProjectSlug ?? 'popy');
+    const apiMeetingEvents = meetings.map(m => ({
+      id: m.id,
+      projectId: m.projectId,
+      title: m.title,
+      type: 'meeting' as const,
+      date: new Date(m.date + 'T' + (m.time || '00:00:00')),
+      time: m.time,
+      description: m.reportData?.notes || `Réunion ${m.meetingType}`,
+    }));
+    return [...localEvents, ...apiMeetingEvents];
+  }, [events, meetings, matchesProject, activeProjectSlug]);
 
   const filteredEvents = useMemo(
     () => (typeFilter === 'all' ? scopedEvents : scopedEvents.filter((e) => e.type === typeFilter)),

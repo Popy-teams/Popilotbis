@@ -53,7 +53,7 @@ export function ProjectsFeature() {
   const [loading] = useState(false);
 
   useEffect(() => {
-    initProjectsFixtures().catch(() => undefined);
+    // initProjectsFixtures() supprimé — route inexistante
   }, []);
 
   useEffect(() => {
@@ -138,7 +138,7 @@ export function ProjectsFeature() {
       deadline: form.deadline,
       budget: { total: parseInt(form.budgetTotal || '0', 10), used: getProjectBudget(base).used },
       team: selectedMemberInitials,
-      participantIds: form.isRestricted ? restrictedParticipants : members.map((m) => m.id),
+      participantIds: restrictedParticipants,
       isRestricted: form.isRestricted,
       ownerId,
       objectives: base?.objectives || [],
@@ -170,20 +170,23 @@ export function ProjectsFeature() {
 
   const submitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.description.trim() || !form.deadline) {
-      setSubmitError('Veuillez renseigner le nom, la description et la date d\'échéance.');
-      return;
-    }
-    setSubmitError('');
-    const next = toProject();
-    upsertProject(next);
-    setActiveProjectId(next.id);
-    setStatusFilter('all');
-    setMode('list');
-    setForm(createEmptyForm(currentMemberId || undefined));
     try {
+      if (!form.name.trim() || !form.description.trim() || !form.deadline) {
+        setSubmitError('Veuillez renseigner le nom, la description et la date d\'échéance.');
+        return;
+      }
+      setSubmitError('');
+      const next = toProject();
       await createProject(next);
-    } catch {}
+      upsertProject(next);
+      setActiveProjectId(next.id);
+      setStatusFilter('all');
+      setMode('list');
+      setForm(createEmptyForm(currentMemberId || undefined));
+    } catch (err: any) {
+      setSubmitError('Erreur lors de la création : ' + (err?.message || String(err) || 'Erreur serveur'));
+      console.error(err);
+    }
   };
 
   const submitEdit = async (e: React.FormEvent) => {

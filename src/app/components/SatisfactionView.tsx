@@ -11,6 +11,7 @@ import {
   saveAllResponses,
   getSurveyPublicUrl,
 } from '../utils/satisfactionStorage';
+import { useApi, apiPost, apiPut, apiDelete } from '../hooks/useApi';
 import type {
   ClientSurvey,
   SatisfactionPageMode,
@@ -41,8 +42,6 @@ export function SatisfactionView() {
   const [activeTab, setActiveTab] = useState<SatisfactionTab>('overview');
   const [activePhase, setActivePhase] = useState<SurveyPhase | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [surveys, setSurveys] = useState<ClientSurvey[]>(INITIAL_SURVEYS);
-  const [responses, setResponses] = useState<SurveyResponse[]>(INITIAL_SURVEY_RESPONSES);
   const [selectedSurvey, setSelectedSurvey] = useState<ClientSurvey | null>(null);
   const [selectedResponse, setSelectedResponse] = useState<SurveyResponse | null>(null);
   const [surveyForm, setSurveyForm] = useState<SurveyFormValues>(emptySurveyForm());
@@ -50,36 +49,35 @@ export function SatisfactionView() {
 
   const projectId = activeProjectSlug ?? 'popy';
 
-  useEffect(() => {
-    const fixtureVersion = localStorage.getItem('popilot:satisfaction-fixture-version');
-    const needsRefresh = fixtureVersion !== SATISFACTION_FIXTURE_VERSION;
+  const { data: apiSurveys, refetch: refetchSurveys } = useApi<any[]>(ready ? `/satisfaction/surveys/${projectId}` : null);
+  const { data: apiResponses, refetch: refetchResponses } = useApi<any[]>(ready ? `/satisfaction/responses/${projectId}` : null);
 
-    if (needsRefresh) {
-      setSurveys(INITIAL_SURVEYS);
-      setResponses(INITIAL_SURVEY_RESPONSES);
-      saveAllSurveys(INITIAL_SURVEYS);
-      saveAllResponses(INITIAL_SURVEY_RESPONSES);
-      localStorage.setItem('popilot:satisfaction-fixture-version', SATISFACTION_FIXTURE_VERSION);
-      return;
-    }
+  const surveys = useMemo(() => {
+    if (!apiSurveys) return [];
+    return apiSurveys.map(s => ({
+      ...s,
+      projectId: s.project_id,
+      shareToken: s.share_token,
+      createdAt: s.created_at,
+      updatedAt: s.updated_at
+    }));
+  }, [apiSurveys]);
 
-    const savedSurveys = loadAllSurveys();
-    const savedResponses = loadAllResponses();
-    setSurveys(savedSurveys.length ? mergeDemoData(savedSurveys, INITIAL_SURVEYS) : INITIAL_SURVEYS);
-    setResponses(
-      savedResponses.length
-        ? mergeDemoData(savedResponses, INITIAL_SURVEY_RESPONSES)
-        : INITIAL_SURVEY_RESPONSES
-    );
-  }, []);
-
-  useEffect(() => {
-    saveAllSurveys(surveys);
-  }, [surveys]);
-
-  useEffect(() => {
-    saveAllResponses(responses);
-  }, [responses]);
+  const responses = useMemo(() => {
+    if (!apiResponses) return [];
+    return apiResponses.map(r => ({
+      ...r,
+      surveyId: r.survey_id,
+      surveyTitle: r.survey_title,
+      projectId: r.project_id,
+      submittedAt: r.submitted_at,
+      respondentName: r.respondent_name,
+      respondentType: r.respondent_type,
+      keyTopics: r.key_topics || [],
+      linkedTasks: r.linked_tasks || [],
+      linkedRisks: r.linked_risks || []
+    }));
+  }, [apiResponses]);
 
   const scopedSurveys = useMemo(
     () => filterByActiveProject(surveys, matchesProject, activeProjectSlug ?? 'popy'),
@@ -142,37 +140,39 @@ export function SatisfactionView() {
     setPageMode('response-view');
   };
 
-  const handleSurveySubmit = (e: React.FormEvent) => {
+  const handleSurveySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!surveyForm.questions.length || !surveyForm.questions.every((q) => q.label.trim())) return;
 
     if (pageMode === 'survey-create') {
       const next = buildSurveyFromForm(surveyForm, undefined, projectId);
-      setSurveys((prev) => [next, ...prev]);
+      await apiPost('/satisfaction/surveys', next);
       setSelectedSurvey(next);
       setPageMode('survey-view');
     } else if (pageMode === 'survey-edit' && selectedSurvey) {
       const next = buildSurveyFromForm(surveyForm, selectedSurvey, projectId);
-      setSurveys((prev) => prev.map((s) => (s.id === next.id ? next : s)));
+      await apiPut(`/satisfaction/surveys/${next.id}`, next);
       setSelectedSurvey(next);
       setPageMode('survey-view');
     }
+    refetchSurveys();
   };
 
-  const removeSurvey = (id: string) => {
-    setSurveys((prev) => prev.filter((s) => s.id !== id));
+  const removeSurvey = async (id: string) => {
+    await apiDelete(`/satisfaction/surveys/${id}`);
+    refetchSurveys();
     goList();
   };
 
-  const removeResponse = (id: string) => {
-    setResponses((prev) => prev.filter((r) => r.id !== id));
+  const removeResponse = async (id: string) => {
+    await apiDelete(`/satisfaction/responses/${id}`);
+    refetchResponses();
     goList();
   };
 
-  const updateResponseStatus = (id: string, status: SurveyResponse['status']) => {
-    setResponses((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status } : r))
-    );
+  const updateResponseStatus = async (id: string, status: SurveyResponse['status']) => {
+    await apiPut(`/satisfaction/responses/${id}`, { status });
+    refetchResponses();
     setSelectedResponse((prev) => (prev?.id === id ? { ...prev, status } : prev));
   };
 

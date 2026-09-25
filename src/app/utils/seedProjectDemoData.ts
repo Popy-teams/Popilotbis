@@ -33,6 +33,8 @@ import { mergeDemoData } from './demoDataMerge';
 const SEED_VERSION_KEY = 'popilot:demo-seed-version';
 const CURRENT_SEED_VERSION = '9';
 
+export const ENABLE_DEMO_SEED = false;
+
 function mergeStorage<T extends { id: string | number }>(key: string, incoming: T[]) {
   if (incoming.length === 0) return;
   try {
@@ -86,6 +88,8 @@ function seedPlanningCalendarDemo() {
 
 /** Injecte les fixtures multi-projets (idempotent, sans écraser les données existantes). */
 export function seedMultiProjectDemoData() {
+  if (!ENABLE_DEMO_SEED) return;
+  
   try {
     const version = localStorage.getItem(SEED_VERSION_KEY);
     if (version === CURRENT_SEED_VERSION) return;

@@ -52,6 +52,7 @@ import {
   phaseToFormValues,
 } from './marketing/marketingPresentation';
 import type { MarketingActionFormValues } from '../types/marketing';
+import { useApi, apiPost, apiPut, apiDelete } from '../hooks/useApi';
 
 export function MarketingStrategyView() {
   const { matchesProject, activeProject, activeProjectSlug, ready } = useProjectContext();
@@ -62,8 +63,6 @@ export function MarketingStrategyView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPhase, setFilterPhase] = useState<MarketingPhase | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<MarketingActionStatus | 'all'>('all');
-  const [actions, setActions] = useState<MarketingAction[]>(INITIAL_MARKETING_ACTIONS);
-  const [phases, setPhases] = useState<RoadmapPhase[]>(ROADMAP_PHASES.map(applyPhaseTheme));
   const [selectedAction, setSelectedAction] = useState<MarketingAction | null>(null);
   const [selectedStrategy, setSelectedStrategy] = useState<StrategyPillar | null>(null);
   const [selectedPhaseId, setSelectedPhaseId] = useState<MarketingPhase | null>(null);
@@ -72,33 +71,26 @@ export function MarketingStrategyView() {
 
   const projectId = activeProjectSlug ?? 'popy';
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(MARKETING_STORAGE_KEY);
-      const saved = raw ? (JSON.parse(raw) as MarketingAction[]) : [];
-      setActions(mergeDemoData(saved, DEMO_MARKETING_BY_PROJECT, INITIAL_MARKETING_ACTIONS));
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const { data: apiActions, refetch: refetchActions } = useApi<any[]>(ready ? `/marketing/${projectId}` : null);
+  const { data: apiPhases, refetch: refetchPhases } = useApi<any[]>(ready ? `/roadmap/${projectId}` : null);
 
-  useEffect(() => {
-    if (!ready) return;
-    setPhases(loadRoadmapForProject(projectId));
-  }, [ready, projectId]);
+  const actions = useMemo(() => {
+    if (!apiActions) return [];
+    return apiActions.map(a => ({
+      ...a,
+      projectId: a.project_id,
+      roiExpected: a.roi_expected
+    }));
+  }, [apiActions]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(MARKETING_STORAGE_KEY, JSON.stringify(actions));
-    } catch {
-      /* ignore */
-    }
-  }, [actions]);
-
-  useEffect(() => {
-    if (!ready) return;
-    saveRoadmapForProject(projectId, phases);
-  }, [phases, projectId, ready]);
+  const phases = useMemo(() => {
+    if (!apiPhases) return [];
+    return apiPhases.map(p => ({
+      ...p,
+      projectId: p.project_id,
+      keyDeliverables: p.key_deliverables || []
+    })).map(applyPhaseTheme);
+  }, [apiPhases]);
 
   const scopedActions = useMemo(
     () => filterByActiveProject(actions, matchesProject, activeProjectSlug ?? 'popy'),
@@ -167,35 +159,38 @@ export function MarketingStrategyView() {
     setPageMode('phase-edit');
   };
 
-  const handleActionSubmit = (e: React.FormEvent) => {
+  const handleActionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (pageMode === 'create') {
       const next = buildActionFromForm(form, undefined, projectId);
-      setActions((prev) => [next, ...prev]);
+      await apiPost('/marketing', next);
       setSelectedAction(next);
       setPageMode('view');
     } else if (pageMode === 'edit' && selectedAction) {
       const next = buildActionFromForm(form, selectedAction, projectId);
-      setActions((prev) => prev.map((item) => (item.id === next.id ? next : item)));
+      await apiPut(`/marketing/${next.id}`, next);
       setSelectedAction(next);
       setPageMode('view');
     }
+    refetchActions();
     setForm(emptyActionForm());
   };
 
-  const handlePhaseSubmit = (e: React.FormEvent) => {
+  const handlePhaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phaseForm || !selectedPhaseId) return;
     const base = phases.find((p) => p.id === selectedPhaseId);
     if (!base) return;
     const next = applyPhaseTheme(buildPhaseFromForm(phaseForm, base));
-    setPhases((prev) => prev.map((p) => (p.id === next.id ? next : p)));
+    await apiPut(`/roadmap/${next.id}`, next);
+    refetchPhases();
     setPhaseForm(null);
     setPageMode('phase-view');
   };
 
-  const removeAction = (id: string) => {
-    setActions((prev) => prev.filter((a) => a.id !== id));
+  const removeAction = async (id: string) => {
+    await apiDelete(`/marketing/${id}`);
+    refetchActions();
     goList();
   };
 

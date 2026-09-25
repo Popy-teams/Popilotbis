@@ -18,7 +18,7 @@ import { publicAnonKey, projectId } from '../utils/supabase/info';
 
 const PROJECTS_STORAGE_KEY = 'popilot:projects-local';
 const ACTIVE_PROJECT_STORAGE_KEY = 'popilot:active-project-id';
-const API_BASE = `https://${projectId}.supabase.co/functions/v1/make-server-036a5a33`;
+const API_BASE = '/api';
 
 export type PortfolioMember = (typeof PORTFOLIO_MEMBERS)[number];
 
@@ -41,12 +41,14 @@ interface ProjectContextValue {
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
 
-function normalizeProject(p: Project): Project {
+function normalizeProject(p: Project, members: PortfolioMember[] = PORTFOLIO_MEMBERS): Project {
   const participantIds = p.isRestricted
     ? (p.participantIds ?? [])
     : p.participantIds?.length
       ? p.participantIds
-      : PORTFOLIO_MEMBERS.map((m) => m.id);
+      : members.map((m) => m.id);
+
+  const team = participantIds.map((id) => members.find((m) => m.id === id)?.name || id);
 
   return {
     ...p,
@@ -54,10 +56,10 @@ function normalizeProject(p: Project): Project {
     participantIds,
     isRestricted: p.isRestricted ?? false,
     progress: p.progress ?? 0,
-    team: p.team ?? [],
+    team,
     budget: {
-      total: p.budget?.total ?? 0,
-      used: p.budget?.used ?? 0,
+      total: p.budget?.total ?? (p as any).budget_total ?? 0,
+      used: p.budget?.used ?? (p as any).budget_used ?? 0,
       committed: p.budget?.committed ?? 0,
     },
   };
@@ -80,8 +82,28 @@ async function fetchApiProjects(): Promise<Project[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5_000);
   try {
+    const token = localStorage.getItem('popilot:auth-token');
     const res = await fetch(`${API_BASE}/projects`, {
-      headers: { Authorization: `Bearer ${publicAnonKey}` },
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      signal: controller.signal,
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.success && Array.isArray(json.data) ? json.data : [];
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchApiUsers(): Promise<any[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5_000);
+  try {
+    const token = localStorage.getItem('popilot:auth-token');
+    const res = await fetch(`${API_BASE}/users`, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       signal: controller.signal,
     });
     if (!res.ok) return [];
@@ -111,6 +133,7 @@ function saveLocalProjects(projects: Project[]) {
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [projects, setProjectsState] = useState<Project[]>([]);
+  const [apiMembers, setApiMembers] = useState<PortfolioMember[]>([]);
   const [activeProjectId, setActiveProjectIdState] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -119,20 +142,36 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      seedMultiProjectDemoData();
-      const local = loadLocalProjects();
-      const api = await fetchApiProjects();
-      const base =
-        local.length > 0
-          ? local
-          : api.length > 0
-          ? api
-          : (PORTFOLIO_PROJECT_FIXTURES as Project[]);
+      // Suppression des données de test
+      // seedMultiProjectDemoData();
+      
+      const [apiProjectsData, apiUsersData] = await Promise.all([
+        fetchApiProjects(),
+        fetchApiUsers()
+      ]);
+      
+      const mappedMembers: PortfolioMember[] = apiUsersData.map((u: any) => {
+        const names = u.name.split(' ');
+        const initials = names.length >= 2 
+          ? (names[0][0] + names[1][0]).toUpperCase()
+          : u.name.substring(0, 2).toUpperCase();
+        
+        return {
+          id: u.id,
+          name: u.name,
+          initials,
+          role: u.role || 'Member',
+          email: u.email,
+          isActive: true
+        };
+      });
 
-      const normalized = base.map(normalizeProject);
+      const normalizedProjects = apiProjectsData.map(p => normalizeProject(p, mappedMembers));
+      
       if (!cancelled) {
-        setProjectsState(normalized);
-        saveLocalProjects(normalized);
+        setProjectsState(normalizedProjects);
+        setApiMembers(mappedMembers);
+        saveLocalProjects(normalizedProjects); // Optionnel, juste pour sauvegarde locale
       }
 
       try {
@@ -170,13 +209,13 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setProjects = useCallback((next: Project[]) => {
-    const normalized = next.map(normalizeProject);
+    const normalized = next.map(p => normalizeProject(p, apiMembers));
     setProjectsState(normalized);
     saveLocalProjects(normalized);
-  }, []);
+  }, [apiMembers]);
 
   const upsertProject = useCallback((project: Project) => {
-    const normalized = normalizeProject(project);
+    const normalized = normalizeProject(project, apiMembers);
     setProjectsState((prev) => {
       const exists = prev.some((p) => p.id === normalized.id);
       const next = exists
@@ -185,7 +224,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       saveLocalProjects(next);
       return next;
     });
-  }, []);
+  }, [apiMembers]);
 
   const removeProject = useCallback((id: string) => {
     setProjectsState((prev) => {
@@ -219,7 +258,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setProjects,
       upsertProject,
       removeProject,
-      members: PORTFOLIO_MEMBERS,
+      members: apiMembers.length > 0 ? apiMembers : PORTFOLIO_MEMBERS, // fallback just in case
       currentMemberId,
       matchesProject,
       canUserSeeProject: (p) => (user ? canUserSeeProject(p, user, currentMemberId) : false),
@@ -235,6 +274,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setProjects,
       upsertProject,
       removeProject,
+      apiMembers,
       currentMemberId,
       matchesProject,
       user,

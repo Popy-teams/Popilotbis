@@ -4,7 +4,7 @@
 export interface TeamMemberData {
   id: string;
   projectId?: string;
-  positionId: string;
+  positionIds: string[];
   /** ID assigné dans l'onglet Tâches (assignedTo), si différent */
   tasksUserId?: string;
   name: string;
@@ -17,14 +17,14 @@ export interface TeamMemberData {
   workload: number;
   responsibilities: string[];
   skills: string[];
-  availability: 'Disponible' | 'Surchargé' | 'En congé';
+  availability: 'Disponible' | 'Surchargé' | 'En congé' | 'Occupé';
   trophies: string[];
 }
 
 export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   {
     id: 'user-sonia',
-    positionId: 'pos-qa',
+    positionIds: ['pos-qa'],
     tasksUserId: 'user-7',
     name: 'Sonia',
     initials: 'SO',
@@ -53,7 +53,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   // Hardware & IoT
   {
     id: 'user-erwan',
-    positionId: 'pos-iot',
+    positionIds: ['pos-iot'],
     name: 'Erwan',
     initials: 'ER',
     role: 'Ingénieur IoT / Électronique',
@@ -79,7 +79,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   },
   {
     id: 'user-yacine',
-    positionId: 'pos-meca',
+    positionIds: ['pos-meca'],
     name: 'Yacine',
     initials: 'YA',
     role: 'Ingénieur mécatronique / robotique',
@@ -105,7 +105,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   },
   {
     id: 'user-fabio',
-    positionId: 'pos-embedded',
+    positionIds: ['pos-embedded'],
     tasksUserId: 'user-6',
     name: 'Fabio',
     initials: 'FA',
@@ -134,7 +134,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   // Intelligence Artificielle
   {
     id: 'user-meriem',
-    positionId: 'pos-cv',
+    positionIds: ['pos-cv'],
     tasksUserId: 'user-1',
     name: 'Mériem',
     initials: 'ME',
@@ -161,7 +161,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   },
   {
     id: 'user-claude',
-    positionId: 'pos-nlp',
+    positionIds: ['pos-nlp'],
     name: 'Claude',
     initials: 'CL',
     role: 'Ingénieur IA / NLP (Langage & voix)',
@@ -187,7 +187,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   },
   {
     id: 'user-data-ia',
-    positionId: 'pos-ml',
+    positionIds: ['pos-ml'],
     name: 'Sarah',
     initials: 'SA',
     role: 'Ingénieur IA / Séries temporelles & comportement',
@@ -214,7 +214,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   // Cybersécurité & protection enfant
   {
     id: 'user-cyber',
-    positionId: 'pos-cyber',
+    positionIds: ['pos-cyber'],
     name: 'Marc',
     initials: 'MA',
     role: 'Ingénieur Cybersécurité',
@@ -240,7 +240,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   },
   {
     id: 'user-rgpd',
-    positionId: 'pos-rgpd',
+    positionIds: ['pos-rgpd'],
     name: 'Julie',
     initials: 'JU',
     role: 'Responsable protection des données (RGPD / Enfant)',
@@ -268,7 +268,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   // Cloud, Backend & Big Data
   {
     id: 'user-cloud',
-    positionId: 'pos-devops',
+    positionIds: ['pos-devops'],
     name: 'David',
     initials: 'DA',
     role: 'Ingénieur Cloud / DevOps',
@@ -294,7 +294,7 @@ export const TEST_TEAM_MEMBERS: TeamMemberData[] = [
   },
   {
     id: 'user-data',
-    positionId: 'pos-data',
+    positionIds: ['pos-data'],
     tasksUserId: 'user-5',
     name: 'Emma',
     initials: 'EM',

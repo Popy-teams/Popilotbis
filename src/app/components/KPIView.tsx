@@ -23,45 +23,31 @@ import {
   emptyKpiForm,
   metricToFormValues,
 } from './kpi/kpiPresentation';
+import { useApi, apiPost, apiPut, apiDelete } from '../hooks/useApi';
 
 export function KPIView() {
   const { activeProject, matchesProject, activeProjectSlug } = useProjectContext();
   const [activeTab, setActiveTab] = useState<KpiTab>('overview');
   const [activeCategoryId, setActiveCategoryId] = useState<KpiCategoryId | null>(null);
   const [pageMode, setPageMode] = useState<KpiPageMode>('list');
-  const [metrics, setMetrics] = useState<KpiMetric[]>([]);
   const [selectedKpi, setSelectedKpi] = useState<KpiMetric | null>(null);
   const [form, setForm] = useState(emptyKpiForm());
+  const { data: apiMetrics, refetch: refetchMetrics } = useApi<any[]>(activeProject ? `/kpi/${activeProject.id}` : null);
 
-  useEffect(() => {
-    try {
-      localStorage.removeItem('popilot:kpi-local');
-      const fixtureVersion = localStorage.getItem(KPI_FIXTURE_VERSION_KEY);
-
-      if (fixtureVersion !== KPI_FIXTURE_VERSION) {
-        setMetrics(FULL_KPI_FIXTURES);
-        localStorage.setItem(KPI_STORAGE_KEY, JSON.stringify(FULL_KPI_FIXTURES));
-        localStorage.setItem(KPI_FIXTURE_VERSION_KEY, KPI_FIXTURE_VERSION);
-        return;
-      }
-
-      const raw = localStorage.getItem(KPI_STORAGE_KEY);
-      const saved: KpiMetric[] = raw ? JSON.parse(raw) : [];
-      const merged = mergeKpiMetrics(saved, FULL_KPI_FIXTURES);
-      setMetrics(merged.length ? merged : FULL_KPI_FIXTURES);
-    } catch {
-      setMetrics(FULL_KPI_FIXTURES);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (metrics.length === 0) return;
-    try {
-      localStorage.setItem(KPI_STORAGE_KEY, JSON.stringify(metrics));
-    } catch {
-      /* ignore */
-    }
-  }, [metrics]);
+  const metrics = useMemo(() => {
+    if (!apiMetrics) return [];
+    return apiMetrics.map(m => ({
+      ...m,
+      projectId: m.project_id,
+      categoryId: m.category_id,
+      measurementMethod: m.measurement_method,
+      targetThreshold: m.target_threshold,
+      thresholdKind: m.threshold_kind,
+      targetNumeric: m.target_numeric,
+      currentValue: m.current_value,
+      previousValue: m.previous_value
+    }));
+  }, [apiMetrics]);
 
   const scopedMetrics = useMemo(
     () => filterByActiveProject(metrics, matchesProject, activeProjectSlug ?? 'popy'),
@@ -92,21 +78,25 @@ export function KPIView() {
     setPageMode('edit');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const next = buildMetricFromForm(form, pageMode === 'edit' ? selectedKpi ?? undefined : undefined);
+    
     if (pageMode === 'create') {
-      setMetrics((prev) => [...prev, next]);
+      await apiPost('/kpi', { ...next, projectId: activeProjectSlug ?? 'popy' });
     } else {
-      setMetrics((prev) => prev.map((m) => (m.id === next.id ? next : m)));
+      await apiPut(`/kpi/${next.id}`, next);
       setSelectedKpi(next);
     }
+    
+    refetchMetrics();
     setPageMode(pageMode === 'edit' ? 'view' : 'list');
     setForm(emptyKpiForm());
   };
 
-  const removeKpi = (id: string) => {
-    setMetrics((prev) => prev.filter((m) => m.id !== id));
+  const removeKpi = async (id: string) => {
+    await apiDelete(`/kpi/${id}`);
+    refetchMetrics();
     goList();
   };
 

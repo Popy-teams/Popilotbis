@@ -35,6 +35,7 @@ import {
   entryToFormValues,
   type VeilleFormValues,
 } from './veille/veillePresentation';
+import { useApi, apiPost, apiPut, apiDelete } from '../hooks/useApi';
 
 export function VeilleView() {
   const { matchesProject, activeProject, activeProjectSlug } = useProjectContext();
@@ -43,28 +44,18 @@ export function VeilleView() {
   const [filterType, setFilterType] = useState<VeilleType | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<VeilleEntry['status'] | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [entries, setEntries] = useState<VeilleEntry[]>(INITIAL_VEILLE_ENTRIES);
+  const { data: apiEntries, refetch: refetchEntries } = useApi<any[]>(activeProject ? `/veille/${activeProject.id}` : null);
   const [selectedEntry, setSelectedEntry] = useState<VeilleEntry | null>(null);
   const [selectedType, setSelectedType] = useState<VeilleType | null>(null);
   const [form, setForm] = useState<VeilleFormValues>(emptyVeilleForm());
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(VEILLE_STORAGE_KEY);
-      const saved = raw ? (JSON.parse(raw) as VeilleEntry[]) : [];
-      setEntries(mergeDemoData(saved, DEMO_VEILLE_BY_PROJECT, INITIAL_VEILLE_ENTRIES));
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(VEILLE_STORAGE_KEY, JSON.stringify(entries));
-    } catch {
-      /* ignore */
-    }
-  }, [entries]);
+  const entries = useMemo(() => {
+    if (!apiEntries) return [];
+    return apiEntries.map(e => ({
+      ...e,
+      projectId: e.project_id
+    }));
+  }, [apiEntries]);
 
   const scopedEntries = useMemo(
     () => filterByActiveProject(entries, matchesProject, activeProjectSlug ?? 'popy'),
@@ -102,24 +93,26 @@ export function VeilleView() {
     setPageMode('type-view');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (pageMode === 'create') {
       const next = buildEntryFromForm(form, undefined, projectId);
-      setEntries((prev) => [next, ...prev]);
+      await apiPost('/veille', next);
       setSelectedEntry(next);
       setPageMode('view');
     } else if (pageMode === 'edit' && selectedEntry) {
       const next = buildEntryFromForm(form, selectedEntry, projectId);
-      setEntries((prev) => prev.map((item) => (item.id === next.id ? next : item)));
+      await apiPut(`/veille/${next.id}`, next);
       setSelectedEntry(next);
       setPageMode('view');
     }
+    refetchEntries();
     setForm(emptyVeilleForm());
   };
 
-  const removeEntry = (id: string) => {
-    setEntries((prev) => prev.filter((e) => e.id !== id));
+  const removeEntry = async (id: string) => {
+    await apiDelete(`/veille/${id}`);
+    refetchEntries();
     goList();
   };
 

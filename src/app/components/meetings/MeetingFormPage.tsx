@@ -17,6 +17,7 @@ export interface MeetingFormValues {
   duration: number;
   participants: string[];
   facilitator: string;
+  writerName?: string;
 }
 
 export function emptyMeetingForm(type: ScrumMeetingType = 'review'): MeetingFormValues {
@@ -43,6 +44,7 @@ interface MeetingFormPageProps {
   onSubmit: (e: React.FormEvent) => void;
   onChange: (values: MeetingFormValues) => void;
   onTypeChange?: (type: ScrumMeetingType) => void;
+  teamMemberNames: string[];
 }
 
 export function MeetingFormPage({
@@ -56,6 +58,7 @@ export function MeetingFormPage({
   onSubmit,
   onChange,
   onTypeChange,
+  teamMemberNames,
 }: MeetingFormPageProps) {
   const toggleParticipant = (name: string) => {
     onChange({
@@ -200,9 +203,9 @@ export function MeetingFormPage({
             onChange={(e) => onChange({ ...values, facilitator: e.target.value })}
           >
             <option value="">— Sélectionner —</option>
-            {TEST_TEAM_MEMBERS.map((m) => (
-              <option key={m.id} value={m.name}>
-                {m.name}
+            {teamMemberNames.map((name) => (
+              <option key={name} value={name}>
+                {name}
               </option>
             ))}
           </FormSelect>
@@ -211,18 +214,18 @@ export function MeetingFormPage({
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-2">Participants *</label>
           <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-            {TEST_TEAM_MEMBERS.map((member) => (
+            {teamMemberNames.map((name) => (
               <label
-                key={member.id}
+                key={name}
                 className="flex items-center gap-2 p-2.5 border border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer text-sm"
               >
                 <input
                   type="checkbox"
-                  checked={values.participants.includes(member.name)}
-                  onChange={() => toggleParticipant(member.name)}
+                  checked={values.participants.includes(name)}
+                  onChange={() => toggleParticipant(name)}
                   className="rounded text-indigo-600"
                 />
-                {member.name}
+                {name}
               </label>
             ))}
           </div>
@@ -230,10 +233,22 @@ export function MeetingFormPage({
         </div>
 
         <div className="rounded-xl bg-violet-50 border border-violet-200 p-4 text-sm text-violet-900">
-          <p className="font-semibold flex items-center gap-2">
+          <p className="font-semibold flex items-center gap-2 mb-2">
             <Info className="w-4 h-4" />
-            Rédacteur automatique : {writerName}
+            Rédacteur du compte rendu
           </p>
+          <FormSelect
+            value={values.writerName || writerName}
+            onChange={(e) => onChange({ ...values, writerName: e.target.value })}
+            className="bg-white border-violet-200 text-violet-900 mb-2"
+          >
+            <option value="">— Rédacteur automatique ({writerName}) —</option>
+            {teamMemberNames.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </FormSelect>
           <p className="text-violet-800 mt-1 text-xs">
             Rotation tous les {periodDays} jours · Ordre du jour pré-rempli (
             {defaultAgendaForType(values.meetingType).length} points)

@@ -13,6 +13,7 @@ import { useProjectContext } from '../../context/ProjectContext';
 import { filterByActiveProject } from '../../utils/projectMatch';
 import { DEMO_BOM_BY_PROJECT } from '../../data/multiProjectDemoFixtures';
 import { mergeDemoData } from '../../utils/demoDataMerge';
+import { useApi, apiPost, apiPut, apiDelete } from '../../hooks/useApi';
 import {
   calculateBudgetTracking,
   type BOMComponent,
@@ -96,7 +97,7 @@ export function BudgetFeature() {
   const [activeTab, setActiveTab] = useState<BudgetTabId>('bom');
   const [screen, setScreen] = useState<Screen>({ type: 'main' });
   const [categories, setCategories] = useState(loadBudgetCategories);
-  const [bomComponents, setBomComponents] = useState<BOMComponent[]>(DEFAULT_BOM_COMPONENTS);
+
   const [quotes, setQuotes] = useState<Quote[]>(loadQuotes);
   const [suppliers, setSuppliers] = useState<Supplier[]>(loadSuppliers);
   const [fundingSources, setFundingSources] = useState<FundingSource[]>(loadFundingSources);
@@ -119,23 +120,35 @@ export function BudgetFeature() {
   const [dataNotice, setDataNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(BOM_STORAGE_KEY);
-      const saved = raw ? (JSON.parse(raw) as BOMComponent[]) : [];
-      setBomComponents(mergeDemoData(saved, DEMO_BOM_BY_PROJECT, DEFAULT_BOM_COMPONENTS));
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const [bomComponents, setBomComponents] = useState<BOMComponent[]>([]);
+  const { data: apiBom, refetch: refetchBom } = useApi<any[]>('/bom');
 
   useEffect(() => {
-    try {
-      localStorage.setItem(BOM_STORAGE_KEY, JSON.stringify(bomComponents));
-    } catch {
-      /* ignore */
+    if (apiBom) {
+      const mapped = apiBom.map((c: any) => ({
+        id: c.id,
+        projectId: c.project_id,
+        category: c.category,
+        name: c.name,
+        functionalName: c.functional_name,
+        example: c.example,
+        quantity: c.quantity,
+        unitPriceEstimated: c.unit_price_estimated,
+        totalEstimated: c.total_estimated,
+        unitPriceActual: c.unit_price_actual,
+        totalActual: c.total_actual,
+        status: c.status,
+        supplierName: c.supplier_id,
+        priceSource: c.price_source,
+        criticality: c.criticality,
+        createdAt: c.created_at || new Date().toISOString(),
+        updatedAt: c.updated_at || new Date().toISOString(),
+        createdBy: 'user-local',
+        lastModifiedBy: 'user-local',
+      }));
+      setBomComponents(mapped);
     }
-  }, [bomComponents]);
+  }, [apiBom]);
 
   useEffect(() => {
     saveQuotes(quotes);
@@ -168,7 +181,7 @@ export function BudgetFeature() {
       const text = await readFileAsText(file);
       const result = parseBudgetImportFile(text);
       if (!result.ok) {
-        setDataNotice({ type: 'error', message: result.error });
+        setDataNotice({ type: 'error', message: (result as any).error });
         return;
       }
       const { bundle } = result;
@@ -295,14 +308,49 @@ export function BudgetFeature() {
     [bomForm, activeProjectSlug]
   );
 
-  const submitBomForm = (e: React.FormEvent) => {
+  const submitBomForm = async (e: React.FormEvent) => {
     e.preventDefault();
     const next = toBomComponent(screen.type === 'component' && screen.mode === 'edit' ? selectedComponent ?? undefined : undefined);
-    if (screen.type === 'component' && screen.mode === 'create') {
-      setBomComponents((prev) => [...prev, next]);
-    } else {
-      setBomComponents((prev) => prev.map((c) => (c.id === next.id ? next : c)));
-    }
+    
+    try {
+      if (screen.type === 'component' && screen.mode === 'create') {
+        await apiPost('/bom', {
+          id: next.id,
+          project_id: next.projectId,
+          category: next.category,
+          name: next.name,
+          functional_name: next.functionalName,
+          example: next.example,
+          quantity: next.quantity,
+          unit_price_estimated: next.unitPriceEstimated,
+          total_estimated: next.totalEstimated,
+          unit_price_actual: next.unitPriceActual,
+          total_actual: next.totalActual,
+          status: next.status,
+          supplier_id: next.supplierName,
+          price_source: next.priceSource,
+          criticality: next.criticality
+        });
+      } else {
+        await apiPut(`/bom/${next.id}`, {
+          category: next.category,
+          name: next.name,
+          functional_name: next.functionalName,
+          example: next.example,
+          quantity: next.quantity,
+          unit_price_estimated: next.unitPriceEstimated,
+          total_estimated: next.totalEstimated,
+          unit_price_actual: next.unitPriceActual,
+          total_actual: next.totalActual,
+          status: next.status,
+          supplier_id: next.supplierName,
+          price_source: next.priceSource,
+          criticality: next.criticality
+        });
+      }
+      refetchBom();
+    } catch(err) { console.error(err); }
+
     goMain();
     setBomForm(emptyBomForm());
   };
@@ -427,9 +475,16 @@ export function BudgetFeature() {
             });
             setScreen({ type: 'component', mode: 'edit', id: selectedComponent.id });
           }}
-          onDelete={() => {
-            setBomComponents((prev) => prev.filter((c) => c.id !== selectedComponent.id));
-            goMain();
+          onDelete={async () => {
+            if (confirm('Supprimer ce composant ?')) {
+              try {
+                await apiDelete(`/bom/${selectedComponent.id}`);
+                refetchBom();
+                goMain();
+              } catch (err) {
+                console.error(err);
+              }
+            }
           }}
         />
       </div>

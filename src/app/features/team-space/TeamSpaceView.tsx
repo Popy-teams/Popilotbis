@@ -12,7 +12,7 @@ import { useProjectContext } from '../../context/ProjectContext';
 import { TEST_TASKS } from '../../data/testData';
 import type { TeamMemberData } from '../../data/testTeamData';
 import { ViewShell } from '../../components/shared';
-import { loadMeetings } from '../../utils/meetingSync';
+import { useApi } from '../../hooks/useApi';
 import { TASKS_STORAGE_KEY } from '../../utils/pipelineSync';
 import type { TestTask } from '../../data/testData';
 import {
@@ -96,7 +96,35 @@ export function TeamSpaceView() {
   const [section, setSection] = useState<SectionId>('overview');
   const [memberPhotos, setMemberPhotos] = useState(loadMemberPhotos);
   const [tasks, setTasks] = useState<TestTask[]>(loadTasks);
-  const [meetings, setMeetings] = useState(() => loadMeetings());
+  const { data: apiMeetings } = useApi<any[]>(activeProject ? `/meetings?project_id=${encodeURIComponent(activeProject.id)}` : '/meetings');
+  const meetings = useMemo(() => {
+    if (!apiMeetings) return [];
+    return apiMeetings.map((m: any) => ({
+      id: m.id,
+      number: 1,
+      title: m.title,
+      meetingType: m.meeting_type as any,
+      date: new Date(m.date).toISOString().split('T')[0],
+      time: new Date(m.date).toTimeString().substring(0, 5),
+      duration: m.duration,
+      participants: m.participant_ids || [],
+      writerId: m.writer_name || '',
+      writerName: m.writer_name || '',
+      status: m.status as any,
+      hasReport: m.has_report,
+      projectId: m.project_id,
+      projectName: m.project_name || 'Projet',
+      agenda: [],
+      roundTable: [],
+      decisions: m.decisions || [],
+      actions: [],
+      reportData: {
+        notes: m.notes || '',
+        decisions: m.decisions || [],
+        tasksCreated: m.tasks_created || []
+      }
+    }));
+  }, [apiMeetings]);
   const [quotes, setQuotes] = useState(() => loadQuotes());
   const [responses, setResponses] = useState(() => loadChallengeResponses());
   const [pointsMap, setPointsMap] = useState(() => loadAllPoints());
@@ -104,7 +132,7 @@ export function TeamSpaceView() {
 
   const refresh = useCallback(() => {
     setTasks(loadTasks());
-    setMeetings(loadMeetings());
+
     setQuotes(loadQuotes());
     setResponses(loadChallengeResponses());
     setPointsMap(loadAllPoints());

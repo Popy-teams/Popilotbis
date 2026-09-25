@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, Mail, Phone, MoreVertical, Award, Target } from 'lucide-react';
 import { AddTeamMemberModal } from './AddTeamMemberModal';
+import { useApi } from '../hooks/useApi';
 
 export function TeamView() {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -11,136 +12,17 @@ export function TeamView() {
     setShowAddModal(false);
   };
 
-  const teamMembers = [
-    {
-      id: 1,
-      name: 'Jean Dupont',
-      initials: 'JD',
-      role: 'Chef de projet',
-      email: 'jean.dupont@company.com',
-      phone: '+33 6 12 34 56 78',
-      workload: 85,
-      projects: ['Refonte plateforme digitale', 'Migration infrastructure cloud', 'Certification ISO 27001'],
-      objectives: [
-        { name: 'Livrer 3 projets dans les temps', progress: 67 },
-        { name: 'Maintenir satisfaction équipe > 4/5', progress: 80 },
-      ],
-      trophies: ['Leadership', 'Respect délais'],
-      availability: 'Disponible',
-    },
-    {
-      id: 2,
-      name: 'Marie Laurent',
-      initials: 'ML',
-      role: 'Designer UX/UI',
-      email: 'marie.laurent@company.com',
-      phone: '+33 6 23 45 67 89',
-      workload: 60,
-      projects: ['Refonte plateforme digitale', 'Application mobile interne'],
-      objectives: [
-        { name: 'Finaliser 50 maquettes', progress: 85 },
-        { name: 'Formation Figma avancé', progress: 100 },
-      ],
-      trophies: ['Qualité constante', 'Innovation'],
-      availability: 'Disponible',
-    },
-    {
-      id: 3,
-      name: 'Thomas Serrano',
-      initials: 'TS',
-      role: 'Architecte Cloud',
-      email: 'thomas.serrano@company.com',
-      phone: '+33 6 34 56 78 90',
-      workload: 95,
-      projects: ['Migration infrastructure cloud'],
-      objectives: [
-        { name: 'Migration cloud complète', progress: 45 },
-        { name: 'Certification AWS Solutions Architect', progress: 60 },
-      ],
-      trophies: ['Expertise technique'],
-      availability: 'Surchargé',
-    },
-    {
-      id: 4,
-      name: 'Aline Moreau',
-      initials: 'AM',
-      role: 'Responsable Qualité',
-      email: 'aline.moreau@company.com',
-      phone: '+33 6 45 67 89 01',
-      workload: 70,
-      projects: ['Certification ISO 27001'],
-      objectives: [
-        { name: 'Obtenir certification ISO 27001', progress: 82 },
-        { name: 'Former 10 collaborateurs à la qualité', progress: 70 },
-      ],
-      trophies: ['Respect des normes', 'Leadership'],
-      availability: 'Disponible',
-    },
-    {
-      id: 5,
-      name: 'Paul Leblanc',
-      initials: 'PL',
-      role: 'Développeur Full-Stack',
-      email: 'paul.leblanc@company.com',
-      phone: '+33 6 56 78 90 12',
-      workload: 80,
-      projects: ['Refonte plateforme digitale', 'Application mobile interne'],
-      objectives: [
-        { name: 'Développer 100 user stories', progress: 55 },
-        { name: 'Réduire dette technique de 30%', progress: 40 },
-      ],
-      trophies: ['Qualité code', 'Entraide'],
-      availability: 'Disponible',
-    },
-    {
-      id: 6,
-      name: 'Alice Chevalier',
-      initials: 'AC',
-      role: 'Ingénieure QA',
-      email: 'alice.chevalier@company.com',
-      phone: '+33 6 67 89 01 23',
-      workload: 55,
-      projects: ['Refonte plateforme digitale'],
-      objectives: [
-        { name: 'Automatiser 80% des tests', progress: 65 },
-        { name: 'Zéro bug critique en production', progress: 90 },
-      ],
-      trophies: ['Zéro bug', 'Qualité constante'],
-      availability: 'Disponible',
-    },
-    {
-      id: 7,
-      name: 'Karim Benali',
-      initials: 'KB',
-      role: 'DBA Senior',
-      email: 'karim.benali@company.com',
-      phone: '+33 6 78 90 12 34',
-      workload: 75,
-      projects: ['Migration infrastructure cloud'],
-      objectives: [
-        { name: 'Migration BDD sans perte données', progress: 30 },
-        { name: 'Optimiser performances de 50%', progress: 45 },
-      ],
-      trophies: ['Expertise technique'],
-      availability: 'Disponible',
-    },
-    {
-      id: 8,
-      name: 'Nadia Cohen',
-      initials: 'NC',
-      role: 'Designer Mobile',
-      email: 'nadia.cohen@company.com',
-      phone: '+33 6 89 01 23 45',
-      workload: 50,
-      projects: ['Application mobile interne'],
-      objectives: [
-        { name: 'Créer design system mobile', progress: 75 },
-        { name: 'Tests utilisateurs > 4.5/5', progress: 80 },
-      ],
-      trophies: ['Innovation', 'Qualité design'],
-      availability: 'Disponible',
-    },
-  ];
+  const { data: apiTeamMembers, loading, error, refetch } = useApi<any[]>('/team-members');
+
+  // On mappe les données de l'API pour s'assurer d'avoir les propriétés manquantes 
+  // (celles qui ne sont pas encore dans la base de données mais nécessaires à l'UI).
+  const teamMembers = (apiTeamMembers || []).map(member => ({
+    ...member,
+    projects: member.projects || [],
+    objectives: member.objectives || [],
+    trophies: member.trophies || [],
+    workload: member.workload || 0
+  }));
 
   const getWorkloadColor = (workload: number) => {
     if (workload >= 90) return { bg: 'bg-red-100', bar: 'bg-red-600', text: 'text-red-800' };

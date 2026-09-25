@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useApi, apiPost, apiPut, apiDelete } from '../hooks/useApi';
 import {
   Plus,
   Mail,
@@ -8,6 +9,7 @@ import {
   SquarePen,
   Trash2,
   Eye,
+  Pencil,
   Briefcase,
   Brain,
   Shield,
@@ -21,15 +23,12 @@ import {
 } from 'lucide-react';
 import { useProjectContext } from '../context/ProjectContext';
 import { filterByActiveProject } from '../utils/projectMatch';
-import { TEST_TEAM_MEMBERS, type TeamMemberData } from '../data/testTeamData';
-import { TEST_TASKS } from '../data/testData';
-import { DEMO_TASKS_BY_PROJECT } from '../data/multiProjectDemoFixtures';
-import { mergeDemoData } from '../utils/demoDataMerge';
-import { TASKS_STORAGE_KEY } from '../utils/pipelineSync';
+import type { TeamMemberData } from '../data/testTeamData';
+import type { TestTask } from '../data/testData';
 import {
   INITIAL_TEAM_POSITIONS,
   POSITIONS_STORAGE_KEY,
-  applyPositionToMember,
+  applyPositionsToMember,
   getPositionById,
   getPositionCategories,
   type TeamPosition,
@@ -41,7 +40,6 @@ import {
   workloadColorClass,
   workloadLabel,
 } from '../utils/teamWorkload';
-import type { TestTask } from '../data/testData';
 import { PageBackHeader } from './shared/PageBackHeader';
 import {
   ViewShell,
@@ -80,31 +78,34 @@ type MemberMode = 'list' | 'create' | 'view' | 'edit';
 type PositionMode = 'list' | 'create' | 'edit';
 
 function normalizeStoredMember(raw: Partial<TeamMemberData>): TeamMemberData {
-  const fallback =
-    TEST_TEAM_MEMBERS.find((m) => m.id === raw.id) ??
-    TEST_TEAM_MEMBERS.find((m) => m.email === raw.email);
-  const positionId =
-    raw.positionId && raw.positionId.length > 0
-      ? raw.positionId
-      : fallback?.positionId ?? INITIAL_TEAM_POSITIONS[0]?.id ?? 'pos-po';
+  const positionIds =
+    raw.positionIds && raw.positionIds.length > 0
+      ? raw.positionIds
+      : (raw as any).position_ids && (raw as any).position_ids.length > 0
+        ? (raw as any).position_ids
+        : (INITIAL_TEAM_POSITIONS[0]?.id ? [INITIAL_TEAM_POSITIONS[0].id] : []);
+
+  const name = raw.name ?? 'Membre';
+  const initials = raw.initials ??
+    name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
 
   return {
-    id: raw.id ?? fallback?.id ?? `user-${Date.now()}`,
-    projectId: raw.projectId ?? fallback?.projectId ?? 'popy',
-    positionId,
-    tasksUserId: raw.tasksUserId ?? fallback?.tasksUserId,
-    name: raw.name ?? fallback?.name ?? 'Membre',
-    initials: raw.initials ?? fallback?.initials ?? '??',
-    role: raw.role ?? fallback?.role ?? 'Membre',
-    category: raw.category ?? fallback?.category ?? 'Direction & Coordination',
-    email: raw.email ?? fallback?.email ?? '',
-    phone: raw.phone ?? fallback?.phone,
-    photoUrl: raw.photoUrl ?? fallback?.photoUrl,
+    id: raw.id ?? `user-${Date.now()}`,
+    projectId: raw.projectId ?? (raw as any).project_id ?? 'popy',
+    positionIds,
+    tasksUserId: raw.tasksUserId,
+    name,
+    initials,
+    role: raw.role ?? 'Membre',
+    category: raw.category ?? 'Direction & Coordination',
+    email: raw.email ?? '',
+    phone: raw.phone,
+    photoUrl: raw.photoUrl,
     workload: raw.workload ?? 0,
-    responsibilities: raw.responsibilities ?? fallback?.responsibilities ?? [],
-    skills: raw.skills ?? fallback?.skills ?? [],
-    availability: raw.availability ?? fallback?.availability ?? 'Disponible',
-    trophies: raw.trophies ?? fallback?.trophies ?? [],
+    responsibilities: raw.responsibilities ?? [],
+    skills: raw.skills ?? [],
+    availability: raw.availability ?? 'Disponible',
+    trophies: raw.trophies ?? [],
   };
 }
 
@@ -113,8 +114,9 @@ function memberToForm(member: TeamMemberData): MemberFormValues {
     name: member.name,
     email: member.email,
     phone: member.phone ?? '',
-    positionId: member.positionId,
+    positionIds: member.positionIds,
     photoUrl: member.photoUrl ?? '',
+    availability: member.availability,
   };
 }
 
@@ -123,9 +125,9 @@ export function TeamViewWithTestData() {
   const [mainTab, setMainTab] = useState<MainTab>('members');
   const [memberMode, setMemberMode] = useState<MemberMode>('list');
   const [positionMode, setPositionMode] = useState<PositionMode>('list');
-  const [members, setMembers] = useState<TeamMemberData[]>(TEST_TEAM_MEMBERS);
+  const [members, setMembers] = useState<TeamMemberData[]>([]);
   const [positions, setPositions] = useState<TeamPosition[]>(INITIAL_TEAM_POSITIONS);
-  const [tasks, setTasks] = useState<TestTask[]>(TEST_TASKS);
+  const [tasks, setTasks] = useState<TestTask[]>([]);
   const [selectedMember, setSelectedMember] = useState<TeamMemberData | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<TeamPosition | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -136,18 +138,21 @@ export function TeamViewWithTestData() {
   const [positionForm, setPositionForm] = useState<PositionFormValues>(emptyPositionForm());
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
+  const { data: apiTeamMembers, refetch: refetchTeam } = useApi<any[]>(
+    activeProject?.id ? `/team-members?project_id=${encodeURIComponent(activeProject.id)}` : '/team-members'
+  );
+
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(TEAM_STORAGE_KEY);
-      if (raw) {
-        const parsed = (JSON.parse(raw) as Partial<TeamMemberData>[])
-          .filter((m) => m.id !== 'user-shirel')
-          .map((m) => normalizeStoredMember(m));
-        setMembers(parsed.length ? parsed : TEST_TEAM_MEMBERS);
-      }
-    } catch {
-      // ignore
+    if (apiTeamMembers) {
+      const parsed = apiTeamMembers.map((m) => normalizeStoredMember(m));
+      setMembers(parsed);
+    } else if (apiTeamMembers !== null) {
+      // API a répondu mais sans données : on vide la liste
+      setMembers([]);
     }
+  }, [apiTeamMembers]);
+
+  useEffect(() => {
     try {
       const rawPos = localStorage.getItem(POSITIONS_STORAGE_KEY);
       if (rawPos) setPositions(JSON.parse(rawPos));
@@ -155,23 +160,7 @@ export function TeamViewWithTestData() {
     } catch {
       // ignore
     }
-    try {
-      const rawTasks = localStorage.getItem(TASKS_STORAGE_KEY);
-      const saved = rawTasks ? (JSON.parse(rawTasks) as TestTask[]) : [];
-      setTasks(mergeDemoData(saved, DEMO_TASKS_BY_PROJECT, TEST_TASKS));
-    } catch {
-      // ignore
-    }
   }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(members));
-      window.dispatchEvent(new CustomEvent('popilot:team-updated'));
-    } catch {
-      // ignore
-    }
-  }, [members]);
 
   useEffect(() => {
     try {
@@ -182,14 +171,17 @@ export function TeamViewWithTestData() {
   }, [positions]);
 
   const scopedMembers = useMemo(
-    () => filterByActiveProject(members, matchesProject, activeProjectSlug ?? 'popy'),
-    [members, matchesProject, activeProjectSlug]
+    () => filterByActiveProject(members, matchesProject, activeProject?.id ?? 'popy'),
+    [members, matchesProject, activeProject?.id]
   );
 
-  const scopedPositions = useMemo(
-    () => filterByActiveProject(positions, matchesProject, activeProjectSlug ?? 'popy'),
-    [positions, matchesProject, activeProjectSlug]
-  );
+  const scopedPositions = useMemo(() => {
+    const matched = filterByActiveProject(positions, matchesProject, activeProject?.id ?? 'popy');
+    if (matched.length === 0) {
+      return INITIAL_TEAM_POSITIONS.map(p => ({ ...p, id: `${p.id}-${activeProject?.id ?? 'popy'}` }));
+    }
+    return matched;
+  }, [positions, matchesProject, activeProject?.id]);
 
   const projectTasks = useMemo(
     () => tasks.filter((t) => matchesProject(t.projectId)),
@@ -248,13 +240,17 @@ export function TeamViewWithTestData() {
   };
 
   const buildMember = (values: MemberFormValues, base?: TeamMemberData): TeamMemberData | null => {
-    const position = getPositionById(scopedPositions, values.positionId);
-    if (!position) return null;
-    const fromPosition = applyPositionToMember(position);
+    const positions = values.positionIds
+      .map(id => scopedPositions.find(p => p.id === id))
+      .filter((p): p is TeamPosition => p !== undefined);
+    
+    if (positions.length === 0) return null;
+    
+    const fromPositions = applyPositionsToMember(positions);
     return {
-      id: base?.id ?? `user-${Date.now()}`,
-      projectId: base?.projectId ?? activeProjectSlug ?? 'popy',
-      positionId: position.id,
+      id: values.userId || base?.id || `user-${Date.now()}`,
+      projectId: base?.projectId ?? activeProject?.id ?? 'popy',
+      positionIds: positions.map(p => p.id),
       name: values.name.trim(),
       initials: values.name
         .split(' ')
@@ -262,40 +258,68 @@ export function TeamViewWithTestData() {
         .join('')
         .slice(0, 2)
         .toUpperCase(),
-      role: fromPosition.role,
-      category: fromPosition.category,
+      role: fromPositions.role,
+      category: fromPositions.category,
       email: values.email.trim(),
       phone: values.phone.trim() || undefined,
       photoUrl: values.photoUrl || base?.photoUrl,
       workload: 0,
       responsibilities: base?.responsibilities ?? [],
-      skills: fromPosition.skills,
-      availability: base?.availability ?? 'Disponible',
+      skills: fromPositions.skills,
+      availability: (values.availability as 'Disponible' | 'Occupé' | 'Surchargé' | 'En congé') ?? base?.availability ?? 'Disponible',
       trophies: base?.trophies ?? [],
     };
   };
 
-  const submitMember = (e: React.FormEvent) => {
+  const submitMember = async (e: React.FormEvent) => {
     e.preventDefault();
     const next = buildMember(memberForm, memberMode === 'edit' ? selectedMember ?? undefined : undefined);
     if (!next) return;
-    if (memberMode === 'create') {
-      setMembers((prev) => [...prev, next]);
-      setMemberMode('list');
-    } else {
-      setMembers((prev) => prev.map((m) => (m.id === next.id ? next : m)));
-      setSelectedMember(next);
-      setMemberMode('view');
+
+    try {
+      if (memberMode === 'create') {
+        const payload = {
+          user_id: memberForm.userId || undefined,
+          project_id: activeProject?.id ?? 'popy',
+          role: next.role,
+          availability: next.availability,
+          workload: next.workload,
+          position_ids: next.positionIds
+        };
+        await apiPost('/team-members', payload);
+      } else {
+        const payload = {
+          name: next.name,
+          initials: next.initials,
+          role: next.role,
+          email: next.email,
+          availability: next.availability,
+          workload: next.workload,
+          position_ids: next.positionIds
+        };
+        await apiPut(`/team-members/${next.id}`, payload);
+      }
+
+      await refetchTeam();
+      
+      if (memberMode === 'create') {
+        setMemberMode('list');
+      } else {
+        setSelectedMember(next);
+        setMemberMode('view');
+      }
+      setMemberForm(emptyMemberForm());
+      setPhotoPreview(null);
+    } catch (err: any) {
+      alert("Erreur lors de l'enregistrement : " + err.message);
     }
-    setMemberForm(emptyMemberForm());
-    setPhotoPreview(null);
   };
 
   const submitPosition = (e: React.FormEvent) => {
     e.preventDefault();
     const base = positionMode === 'edit' && selectedPosition
       ? { id: selectedPosition.id, projectId: selectedPosition.projectId }
-      : { id: `pos-${Date.now()}`, projectId: activeProjectSlug ?? 'popy' };
+      : { id: `pos-${Date.now()}`, projectId: activeProject?.id ?? 'popy' };
     const next = formValuesToPosition(positionForm, base);
     if (positionMode === 'create') {
       setPositions((prev) => [...prev, next]);
@@ -303,8 +327,13 @@ export function TeamViewWithTestData() {
       setPositions((prev) => prev.map((p) => (p.id === next.id ? next : p)));
       setMembers((prev) =>
         prev.map((m) =>
-          m.positionId === next.id
-            ? { ...m, ...applyPositionToMember(next), positionId: next.id }
+          m.positionIds.includes(next.id)
+            ? { 
+                ...m, 
+                ...applyPositionsToMember(
+                  m.positionIds.map(pid => pid === next.id ? next : (scopedPositions.find(p => p.id === pid) as TeamPosition)).filter(Boolean)
+                ) 
+              }
             : m
         )
       );
@@ -314,14 +343,20 @@ export function TeamViewWithTestData() {
     setSelectedPosition(null);
   };
 
-  const removeMember = (id: string) => {
-    setMembers((prev) => prev.filter((m) => m.id !== id));
-    setSelectedMember(null);
-    setMemberMode('list');
+  const removeMember = async (id: string) => {
+    if (!confirm('Êtes-vous sûr de vouloir retirer ce membre ?')) return;
+    try {
+      await apiDelete(`/team-members/${id}`);
+      await refetchTeam();
+      setSelectedMember(null);
+      setMemberMode('list');
+    } catch (err: any) {
+      alert("Erreur lors de la suppression : " + err.message);
+    }
   };
 
   const removePosition = (id: string) => {
-    if (members.some((m) => m.positionId === id)) {
+    if (members.some((m) => m.positionIds.includes(id))) {
       alert('Ce poste est assigné à un ou plusieurs membres. Réassignez-les avant de supprimer.');
       return;
     }
@@ -380,7 +415,7 @@ export function TeamViewWithTestData() {
       workload: workloads[selectedMember.id] ?? 0,
       taskCount: countAssignedTasks(projectTasks, selectedMember),
     };
-    const position = getPositionById(scopedPositions, m.positionId);
+    const positions = m.positionIds.map(id => scopedPositions.find(p => p.id === id)).filter(Boolean);
     return (
       <ViewShell>
         <PageBackHeader
@@ -467,14 +502,18 @@ export function TeamViewWithTestData() {
             </div>
           </section>
 
-          {position && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-violet-600" />
-                Poste : {position.title}
-              </h3>
-              <p className="text-xs text-slate-500 mb-3">{position.category}</p>
-              <div className="flex flex-wrap gap-1.5">
+          {positions.length > 0 && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+              {positions.map(position => (
+                <div key={position.id}>
+                  <h3 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-violet-600" />
+                    Poste : {position.title}
+                  </h3>
+                  <p className="text-xs text-slate-500 mb-3">{position.category}</p>
+                </div>
+              ))}
+              <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100">
                 {m.skills.map((s) => (
                   <span key={s} className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs">
                     {s}
@@ -603,7 +642,7 @@ export function TeamViewWithTestData() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 min-w-0 w-full">
               {filteredPositions.map((position) => {
-                const assignedMembers = members.filter((m) => m.positionId === position.id);
+                const assignedMembers = members.filter((m) => m.positionIds.includes(position.id));
                 return (
                   <PositionCard
                     key={position.id}

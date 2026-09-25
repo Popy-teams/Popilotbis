@@ -3,11 +3,13 @@ import type { TeamPosition } from '../../data/teamPositions';
 import { ViewShell, PageBackHeader, ActionButton, AppIcon, FormSelect } from '../shared';
 
 export interface MemberFormValues {
+  userId?: string;
   name: string;
   email: string;
   phone: string;
-  positionId: string;
+  positionIds: string[];
   photoUrl: string;
+  availability?: string;
 }
 
 const inputClass =
@@ -27,6 +29,8 @@ interface MemberFormPageProps {
   onPhotoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
+import { useApi } from '../../hooks/useApi';
+
 export function MemberFormPage({
   mode,
   values,
@@ -38,8 +42,19 @@ export function MemberFormPage({
   onChange,
   onPhotoUpload,
 }: MemberFormPageProps) {
-  const selectedPosition = positions.find((p) => p.id === values.positionId);
+  const selectedPositions = positions.filter((p) => values.positionIds.includes(p.id));
   const patch = (partial: Partial<MemberFormValues>) => onChange({ ...values, ...partial });
+
+  const { data: users } = useApi<any[]>('/users');
+
+  const handleUserChange = (userId: string) => {
+    const user = users?.find(u => u.id === userId);
+    if (user) {
+      patch({ userId: user.id, name: user.name, email: user.email });
+    } else {
+      patch({ userId: '' });
+    }
+  };
 
   return (
     <ViewShell>
@@ -79,6 +94,24 @@ export function MemberFormPage({
                 <input type="file" accept="image/*" onChange={onPhotoUpload} className="hidden" />
               </label>
             </div>
+          </div>
+
+          <div>
+            <label className={labelClass} htmlFor="member-user">
+              Lier à un compte utilisateur existant
+            </label>
+            <FormSelect
+              id="member-user"
+              value={values.userId || ''}
+              onChange={(e) => handleUserChange(e.target.value)}
+            >
+              <option value="">Sélectionner un utilisateur...</option>
+              {users?.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name} ({u.email})
+                </option>
+              ))}
+            </FormSelect>
           </div>
 
           <div>
@@ -125,29 +158,60 @@ export function MemberFormPage({
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm space-y-4">
           <div>
-            <label className={labelClass} htmlFor="member-position">
-              Poste *
+            <label className={labelClass}>
+              Postes * (Cochez un ou plusieurs)
+            </label>
+            <div className="space-y-1 max-h-48 overflow-y-auto p-2 border border-slate-200 rounded-xl bg-white">
+              {positions.map((p) => {
+                const isSelected = values.positionIds.includes(p.id);
+                return (
+                  <label key={p.id} className={`flex items-start gap-3 p-2.5 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50/50' : 'hover:bg-slate-50'}`}>
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 cursor-pointer"
+                      checked={isSelected}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          patch({ positionIds: [...values.positionIds, p.id] });
+                        } else {
+                          patch({ positionIds: values.positionIds.filter(id => id !== p.id) });
+                        }
+                      }}
+                    />
+                    <div>
+                      <div className={`text-sm font-medium leading-tight ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{p.title}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">{p.category}</div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+            {values.positionIds.length === 0 && (
+              <p className="mt-2 text-xs text-red-500">Veuillez sélectionner au moins un poste.</p>
+            )}
+          </div>
+
+          <div>
+            <label className={labelClass} htmlFor="member-availability">
+              Disponibilité
             </label>
             <FormSelect
-              id="member-position"
-              required
-              value={values.positionId}
-              onChange={(e) => patch({ positionId: e.target.value })}
+              id="member-availability"
+              value={values.availability || 'Disponible'}
+              onChange={(e) => patch({ availability: e.target.value })}
             >
-              <option value="">Sélectionner un poste</option>
-              {positions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.title} — {p.category}
-                </option>
-              ))}
+              <option value="Disponible">Disponible</option>
+              <option value="Occupé">Occupé</option>
+              <option value="Surchargé">Surchargé</option>
+              <option value="En congé">En congé</option>
             </FormSelect>
           </div>
 
-          {selectedPosition && (
+          {selectedPositions.length > 0 && (
             <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-              <p className="text-xs font-medium text-slate-500 mb-2">Compétences du poste</p>
+              <p className="text-xs font-medium text-slate-500 mb-2">Compétences des postes</p>
               <div className="flex flex-wrap gap-1.5">
-                {selectedPosition.competencies.map((skill) => (
+                {Array.from(new Set(selectedPositions.flatMap(p => p.competencies))).map((skill) => (
                   <span
                     key={skill}
                     className="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-800 text-xs"
@@ -178,7 +242,7 @@ export function emptyMemberForm(defaultPositionId = ''): MemberFormValues {
     name: '',
     email: '',
     phone: '',
-    positionId: defaultPositionId,
+    positionIds: defaultPositionId ? [defaultPositionId] : [],
     photoUrl: '',
   };
 }

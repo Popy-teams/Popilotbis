@@ -12,9 +12,11 @@ import {
   type Risk,
   type RiskCategory,
   generateAutoRiskSuggestions,
+  type RiskOrigin,
 } from '../types/risks';
 import { useProjectContext } from '../context/ProjectContext';
 import { usePipeline } from '../context/PipelineContext';
+import { useApi, apiPost, apiPut, apiDelete } from '../hooks/useApi';
 import { RISKS_STORAGE_KEY } from '../utils/pipelineSync';
 import { DEMO_RISKS_BY_PROJECT } from '../data/multiProjectDemoFixtures';
 import { mergeDemoData } from '../utils/demoDataMerge';
@@ -62,22 +64,56 @@ export function RisksView() {
   const [filterType, setFilterType] = useState<'all' | 'risk' | 'opportunity'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'open' | 'closed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [risks, setRisks] = useState<Risk[]>(INITIAL_RISKS);
+  const [risks, setRisks] = useState<Risk[]>([]);
   const [selectedRisk, setSelectedRisk] = useState<Risk | null>(null);
   const [selectedSuggestion, setSelectedSuggestion] = useState<AutoRiskSuggestion | null>(null);
   const [selectedIndicator, setSelectedIndicator] = useState<RiskIndicatorConfig | null>(null);
   const [indicators, setIndicators] = useState<RiskIndicatorConfig[]>(DEFAULT_RISK_INDICATORS);
   const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState<string[]>([]);
   const [form, setForm] = useState<RiskFormValues>(emptyRiskForm());
+  
+  const { data: apiRisks, refetch: refetchRisks } = useApi<any[]>('/risks');
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(RISKS_STORAGE_KEY);
-      const saved = raw ? (JSON.parse(raw) as Risk[]) : [];
-      setRisks(mergeDemoData(saved, DEMO_RISKS_BY_PROJECT, INITIAL_RISKS));
-    } catch {
-      /* ignore */
+    if (apiRisks) {
+      const mapped = apiRisks.map((r: any) => ({
+        id: r.id,
+        projectId: r.project_id,
+        title: r.title,
+        description: r.description,
+        category: r.category as RiskCategory,
+        type: r.type,
+        status: r.status,
+        probability: r.probability,
+        impacts: {
+          cost: r.impact_cost,
+          delay: r.impact_delay,
+          quality: r.impact_quality,
+          security: r.impact_security,
+          image: r.impact_image,
+        },
+        criticality: r.criticality,
+        criticalityScore: r.criticality_score,
+        strategy: r.strategy,
+        history: [],
+        actions: [],
+        origin: 'project' as RiskOrigin,
+        detectedBy: 'user-1',
+        detectedAt: r.created_at || new Date().toISOString(),
+        tags: [],
+        autoDetected: false,
+        lastReviewedAt: r.updated_at || new Date().toISOString(),
+        nextReviewDate: '',
+        owner: 'user-1',
+        visibility: 'team' as const,
+        createdAt: r.created_at || new Date().toISOString(),
+        updatedAt: r.updated_at || new Date().toISOString(),
+      }));
+      setRisks(mapped);
     }
+  }, [apiRisks]);
+
+  useEffect(() => {
     try {
       const indRaw = localStorage.getItem(RISK_INDICATORS_STORAGE_KEY);
       if (indRaw) setIndicators(JSON.parse(indRaw) as RiskIndicatorConfig[]);
@@ -91,14 +127,6 @@ export function RisksView() {
       /* ignore */
     }
   }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(RISKS_STORAGE_KEY, JSON.stringify(risks));
-    } catch {
-      /* ignore */
-    }
-  }, [risks]);
 
   useEffect(() => {
     try {
@@ -167,7 +195,7 @@ export function RisksView() {
     setPageMode('create');
   };
 
-  const submitForm = (e: React.FormEvent) => {
+  const submitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (pageMode === 'create') {
       const next = buildRiskFromForm(form, undefined, projectId);
@@ -175,7 +203,29 @@ export function RisksView() {
         next.autoDetected = true;
         next.autoDetectionSource = selectedSuggestion.sourceDetails;
       }
-      setRisks((prev) => [next, ...prev]);
+      
+      try {
+        await apiPost('/risks', {
+          id: next.id,
+          project_id: next.projectId,
+          title: next.title,
+          description: next.description,
+          category: next.category,
+          type: next.type,
+          status: next.status,
+          probability: next.probability,
+          impact_cost: next.impacts.cost,
+          impact_delay: next.impacts.delay,
+          impact_quality: next.impacts.quality,
+          impact_security: next.impacts.security,
+          impact_image: next.impacts.image,
+          criticality: next.criticality,
+          criticality_score: next.criticalityScore,
+          strategy: next.strategy
+        });
+        refetchRisks();
+      } catch(err) { console.error(err); }
+
       if (selectedSuggestion) {
         setDismissedSuggestionIds((prev) => [...prev, selectedSuggestion.id]);
       }
@@ -183,7 +233,27 @@ export function RisksView() {
       setPageMode('view');
     } else if (pageMode === 'edit' && selectedRisk) {
       const next = buildRiskFromForm(form, selectedRisk, projectId);
-      setRisks((prev) => prev.map((r) => (r.id === next.id ? next : r)));
+      
+      try {
+        await apiPut(`/risks/${next.id}`, {
+          title: next.title,
+          description: next.description,
+          category: next.category,
+          type: next.type,
+          status: next.status,
+          probability: next.probability,
+          impact_cost: next.impacts.cost,
+          impact_delay: next.impacts.delay,
+          impact_quality: next.impacts.quality,
+          impact_security: next.impacts.security,
+          impact_image: next.impacts.image,
+          criticality: next.criticality,
+          criticality_score: next.criticalityScore,
+          strategy: next.strategy
+        });
+        refetchRisks();
+      } catch(err) { console.error(err); }
+
       setSelectedRisk(next);
       setPageMode('view');
     }
@@ -191,8 +261,12 @@ export function RisksView() {
     setSelectedSuggestion(null);
   };
 
-  const removeRisk = (id: string) => {
-    setRisks((prev) => prev.filter((r) => r.id !== id));
+  const removeRisk = async (id: string) => {
+    if (!confirm('Supprimer ce risque ?')) return;
+    try {
+      await apiDelete(`/risks/${id}`);
+      refetchRisks();
+    } catch(err) { console.error(err); }
     goList();
   };
 

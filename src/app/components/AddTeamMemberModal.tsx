@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FormActions } from './shared';
 import { X, UserPlus, Save, GraduationCap, Calendar } from 'lucide-react';
+import { useApi } from '../hooks/useApi';
 
 interface AddTeamMemberModalProps {
   onClose: () => void;
@@ -8,10 +9,10 @@ interface AddTeamMemberModalProps {
 }
 
 export function AddTeamMemberModal({ onClose, onSubmit }: AddTeamMemberModalProps) {
+  const { data: users } = useApi<any[]>('/users');
+  
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
+    user_id: '',
     role: '',
     experienceLevel: 'intermediate' as 'junior' | 'intermediate' | 'senior' | 'expert',
     joinDate: new Date().toISOString().split('T')[0],
@@ -77,50 +78,30 @@ export function AddTeamMemberModal({ onClose, onSubmit }: AddTeamMemberModalProp
 
           {/* Informations de base */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-gray-900">Informations personnelles</h3>
+            <h3 className="font-semibold text-gray-900">Sélectionner un utilisateur</h3>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Nom complet *
+                  Utilisateur existant *
                 </label>
-                <input
-                  type="text"
+                <select
                   required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Ex: Sophie Martin"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="sophie.martin@example.com"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                />
+                  value={formData.user_id}
+                  onChange={(e) => setFormData({ ...formData, user_id: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 bg-white"
+                >
+                  <option value="">Sélectionnez un compte...</option>
+                  {users?.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} ({user.email}) - {user.role}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Téléphone
-                </label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+33 6 12 34 56 78"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                />
-              </div>
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Rôle *

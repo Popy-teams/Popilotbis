@@ -412,7 +412,7 @@ export function ViewEmptyState({
   description,
   action,
 }: {
-  icon: LucideIcon;
+  icon?: LucideIcon;
   title: string;
   description?: string;
   action?: ReactNode;
@@ -420,7 +420,7 @@ export function ViewEmptyState({
   return (
     <div className="relative overflow-hidden py-16 text-center rounded-[1.25rem] border border-dashed border-slate-200 bg-gradient-to-b from-slate-50 to-white">
       <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-indigo-100/40 blur-3xl" />
-      <Icon className="w-12 h-12 text-slate-300 mx-auto mb-4 relative" />
+      {Icon && <Icon className="w-12 h-12 text-slate-300 mx-auto mb-4 relative" />}
       <p className="text-base font-semibold text-slate-700 relative">{title}</p>
       {description ? (
         <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto relative">{description}</p>

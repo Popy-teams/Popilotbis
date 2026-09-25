@@ -3,7 +3,8 @@ import { Plus } from 'lucide-react';
 import { useProjectContext } from '../context/ProjectContext';
 import { usePipeline } from '../context/PipelineContext';
 import { applyPipelineSync } from '../utils/pipelineSync';
-import type { DocumentCategoryDef, ISODocument } from '../types/documents';
+import { useApi, apiPost, apiPut, apiDelete } from '../hooks/useApi';
+import type { DocumentCategoryDef, ISODocument, ISODocumentType } from '../types/documents';
 import { INITIAL_DOCUMENTS } from '../data/documentationDemoData';
 import {
   BUILTIN_DOCUMENT_CATEGORIES,
@@ -50,36 +51,31 @@ export function DocumentationView() {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    try {
-      const fixtureVersion = localStorage.getItem(DOC_FIXTURE_VERSION_KEY);
-      const raw = localStorage.getItem(DOCS_STORAGE_KEY);
-      const saved: ISODocument[] = raw ? JSON.parse(raw) : [];
-
-      if (fixtureVersion !== DOC_FIXTURE_VERSION) {
-        setDocuments(INITIAL_DOCUMENTS);
-        localStorage.setItem(DOCS_STORAGE_KEY, JSON.stringify(INITIAL_DOCUMENTS));
-        localStorage.setItem(DOC_FIXTURE_VERSION_KEY, DOC_FIXTURE_VERSION);
-      } else {
-        setDocuments(saved.length ? saved : INITIAL_DOCUMENTS);
-      }
-
-      setCategories(loadDocumentCategories());
-    } catch {
-      setDocuments(INITIAL_DOCUMENTS);
-      setCategories(BUILTIN_DOCUMENT_CATEGORIES);
-    }
-  }, []);
+  const { data: apiDocs, refetch: refetchDocs } = useApi<any[]>('/documents');
 
   useEffect(() => {
-    if (documents.length === 0) return;
-    try {
-      localStorage.setItem(DOCS_STORAGE_KEY, JSON.stringify(documents));
-      applyPipelineSync(undefined, documents);
-    } catch {
-      /* ignore */
+    if (apiDocs) {
+      const mapped = apiDocs.map((d: any) => ({
+        id: d.id,
+        title: d.title,
+        type: d.type as ISODocumentType,
+        category: d.category,
+        status: d.status,
+        responsible: d.responsible,
+        responsibleName: d.responsible,
+        version: d.version,
+        validUntil: d.valid_until,
+        description: d.description,
+        content: d.content,
+        linkedTo: { projectId: d.project_id },
+        createdAt: d.created_at || new Date().toISOString(),
+        updatedAt: d.updated_at || new Date().toISOString(),
+        history: [],
+      }));
+      setDocuments(mapped);
     }
-  }, [documents]);
+    setCategories(loadDocumentCategories());
+  }, [apiDocs]);
 
   const scopedDocuments = useMemo(
     () => documents.filter((d) => matchesProject(d.linkedTo?.projectId ?? 'popy')),
@@ -113,27 +109,60 @@ export function DocumentationView() {
     setPageMode('edit');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const next = buildDocumentFromForm(
       form,
       pageMode === 'edit' ? selectedDoc ?? undefined : undefined,
       projectId
     );
+    
+    try {
+      if (pageMode === 'create') {
+        await apiPost('/documents', {
+          id: next.id,
+          project_id: next.linkedTo?.projectId ?? projectId,
+          title: next.title,
+          type: next.type,
+          category: next.category,
+          status: next.status,
+          responsible: next.responsible,
+          version: next.version,
+          valid_until: next.validUntil,
+          description: next.description,
+          content: next.content
+        });
+      } else {
+        await apiPut(`/documents/${next.id}`, {
+          title: next.title,
+          type: next.type,
+          category: next.category,
+          status: next.status,
+          responsible: next.responsible,
+          version: next.version,
+          valid_until: next.validUntil,
+          description: next.description,
+          content: next.content
+        });
+      }
+      refetchDocs();
+    } catch(err) { console.error(err); }
+
     if (pageMode === 'create') {
-      setDocuments((prev) => [...prev, next]);
       goList();
     } else {
-      setDocuments((prev) => prev.map((d) => (d.id === next.id ? next : d)));
       setSelectedDoc(next);
       setPageMode('view');
     }
     setForm(emptyDocumentForm());
   };
 
-  const removeDoc = (doc: ISODocument) => {
+  const removeDoc = async (doc: ISODocument) => {
     if (!window.confirm(`Supprimer « ${doc.title} » ?`)) return;
-    setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+    try {
+      await apiDelete(`/documents/${doc.id}`);
+      refetchDocs();
+    } catch(err) { console.error(err); }
     goList();
   };
 

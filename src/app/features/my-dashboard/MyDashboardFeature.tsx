@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import {
   AlertCircle,
@@ -10,6 +10,7 @@ import {
 import { useAuth } from '../../auth/AuthContext';
 import { useProjectContext } from '../../context/ProjectContext';
 import { getRoutePath } from '../../routes/viewRoutes';
+import { useApi } from '../../hooks/useApi';
 import { loadPersonalProfile, getDisplayName } from '../../data/personalProfileStore';
 import { MY_DASHBOARD_DEMO } from '../../data/myDashboardDemoData';
 import type { BlockageFormValues, DashboardTab, DashboardUserData } from '../../types/dashboard';
@@ -33,7 +34,58 @@ export function MyDashboardFeature() {
 
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   const [pageMode, setPageMode] = useState<'list' | 'declare-blockage'>('list');
-  const [dashboardData, setDashboardData] = useState<DashboardUserData>(MY_DASHBOARD_DEMO);
+  const [dashboardData, setDashboardData] = useState<DashboardUserData>({
+    workload: 0,
+    tasks: [],
+    objectives: [],
+    trophies: [],
+    meetings: [],
+    actions: [],
+  });
+
+  const { data: apiTasks } = useApi<any[]>('/tasks');
+  const { data: apiMeetings } = useApi<any[]>('/meetings');
+  const { data: apiObjectives } = useApi<any[]>('/objectives');
+
+  useEffect(() => {
+    setDashboardData(prev => {
+      const next = { ...prev };
+      
+      if (apiTasks) {
+        next.tasks = apiTasks.map(t => ({
+          id: t.id,
+          title: t.title,
+          project: t.project_id,
+          status: t.status,
+          priority: t.priority || 'medium',
+          dueDate: t.due_date || '',
+          progress: t.status === 'done' ? 100 : t.status === 'in-progress' ? 50 : 0
+        }));
+      }
+      
+      if (apiMeetings) {
+        next.meetings = apiMeetings.map(m => ({
+          id: m.id,
+          title: m.title,
+          date: m.date,
+          time: m.time || '10:00',
+          participants: Array.isArray(m.participant_ids) ? m.participant_ids.length : (m.participants || 0)
+        }));
+      }
+      
+      if (apiObjectives) {
+        next.objectives = apiObjectives.map(o => ({
+          id: o.id,
+          name: o.name,
+          progress: o.progress,
+          target: o.target,
+          deadline: o.deadline
+        }));
+      }
+      
+      return next;
+    });
+  }, [apiTasks, apiMeetings, apiObjectives]);
 
   const scoped = useMemo(
     () => scopeDashboardData(dashboardData, matchesProject, activeProjectSlug),

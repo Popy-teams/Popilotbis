@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { TEST_TASKS, TEST_TEAM_MEMBERS, type TestTask } from '../data/testData';
+import { useApi, apiPost, apiPut, apiDelete } from '../hooks/useApi';
 import { MEETING_DEMO_TASKS } from '../data/meetingDemoData';
 import { DEMO_TASKS_BY_PROJECT } from '../data/multiProjectDemoFixtures';
 import { mergeDemoData } from '../utils/demoDataMerge';
@@ -39,27 +40,53 @@ export function TasksViewWithTestData() {
     emptyTaskForm(TEST_TEAM_MEMBERS[0]?.id ?? '')
   );
 
-  useEffect(() => {
-    const reload = () => {
-      try {
-        const raw = localStorage.getItem(TASKS_STORAGE_KEY);
-        const saved = raw ? (JSON.parse(raw) as TestTask[]) : [];
-        setTasks(mergeDemoData(saved, DEMO_TASKS_BY_PROJECT, MEETING_DEMO_TASKS, TEST_TASKS));
-      } catch {
-        // ignore
+  const { data: apiTasks, refetch: refetchTasks } = useApi<any[]>('/tasks');
+  const { data: apiMembers } = useApi<any[]>(
+    activeProject?.id ? `/team-members?project_id=${encodeURIComponent(activeProject.id)}` : '/team-members'
+  );
+
+  const membersList = useMemo(() => {
+    if (apiMembers) {
+      // Deduplicate by name or user_id in case we are viewing all projects
+      const unique = [];
+      const seen = new Set();
+      for (const m of apiMembers) {
+        const key = m.user_id || m.name || m.id;
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push(m);
+        }
       }
-    };
-    reload();
-    window.addEventListener('popilot:pipeline-updated', reload);
-    window.addEventListener('popilot:meetings-updated', reload);
-    return () => {
-      window.removeEventListener('popilot:pipeline-updated', reload);
-      window.removeEventListener('popilot:meetings-updated', reload);
-    };
-  }, []);
+      return unique;
+    }
+    return TEST_TEAM_MEMBERS;
+  }, [apiMembers]);
+
+  useEffect(() => {
+    if (apiTasks) {
+      const mapped = apiTasks.map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        description: t.description || '',
+        projectId: t.project_id,
+        projectName: t.project_id, 
+        assignedTo: t.assigned_to,
+        assignedToName: t.assigned_to_name || membersList.find((m: any) => m.id === t.assigned_to)?.name || t.assigned_to,
+        status: t.status,
+        priority: t.priority,
+        dueDate: t.due_date ? new Date(t.due_date).toISOString().split('T')[0] : '',
+        progress: t.progress,
+        subtasks: [],
+        stageId: null,
+        linkedToProcesses: [],
+        linkedToProcessSteps: []
+      }));
+      setTasks(mapped);
+    }
+  }, [apiTasks, membersList]);
 
   const projectTasks = useMemo(
-    () => filterByActiveProject(tasks, matchesProject, activeProjectSlug ?? 'popy'),
+    () => filterByActiveProject(tasks, matchesProject, activeProject?.id ?? 'popy'),
     [tasks, matchesProject, activeProjectSlug]
   );
 
@@ -91,20 +118,46 @@ export function TasksViewWithTestData() {
     setPageMode('view');
   };
 
-  const submitForm = (e: React.FormEvent) => {
+  const submitForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    const base = pageMode === 'edit' && selectedTask ? selectedTask : { id: `task-${Date.now()}` };
+    const isEdit = pageMode === 'edit' && selectedTask;
+    const base = isEdit && selectedTask ? selectedTask : { id: `task-${Date.now()}` };
     const next = formValuesToTask(
       form,
       base,
-      TEST_TEAM_MEMBERS,
-      activeProjectSlug ?? 'popy',
+      membersList,
+      activeProject?.id ?? 'popy',
       activeProject?.name ?? 'Projet'
     );
-    const baseTasks =
-      pageMode === 'create' ? [next, ...tasks] : tasks.map((t) => (t.id === next.id ? next : t));
-    const syncedTasks = linkTaskToPipelineStage(next.id, next.stageId, baseTasks);
-    persistTasks(syncedTasks);
+    
+    try {
+      if (isEdit) {
+        await apiPut(`/tasks/${next.id}`, {
+          title: next.title,
+          description: next.description,
+          assigned_to: next.assignedTo,
+          status: next.status,
+          priority: next.priority,
+          due_date: next.dueDate,
+          progress: next.progress
+        });
+      } else {
+        await apiPost('/tasks', {
+          id: next.id,
+          title: next.title,
+          description: next.description,
+          project_id: next.projectId,
+          assigned_to: next.assignedTo,
+          status: next.status,
+          priority: next.priority,
+          due_date: next.dueDate,
+          progress: next.progress
+        });
+      }
+      refetchTasks();
+    } catch (err) {
+      console.error(err);
+    }
 
     if (pageMode === 'create') {
       setPageMode('list');
@@ -113,23 +166,31 @@ export function TasksViewWithTestData() {
       setSelectedTask(next);
       setPageMode('view');
     }
-    setForm(emptyTaskForm(TEST_TEAM_MEMBERS[0]?.id ?? ''));
+    setForm(emptyTaskForm(membersList[0]?.id ?? ''));
   };
 
-  const removeTask = (id: string) => {
-    persistTasks(removeTaskFromPipeline(id, tasks));
+  const removeTask = async (id: string) => {
+    try {
+      await apiDelete(`/tasks/${id}`);
+      refetchTasks();
+    } catch(err) {
+      console.error(err);
+    }
     setSelectedTask(null);
     setPageMode('list');
   };
 
-  const updateTaskStatus = (taskId: string, status: TestTask['status']) => {
-    const next = tasks.map((t) => {
-      if (t.id !== taskId) return t;
-      const progress =
-        status === 'done' ? 100 : status === 'todo' ? Math.min(t.progress, 10) : t.progress;
-      return { ...t, status, progress };
-    });
-    persistTasks(next);
+  const updateTaskStatus = async (taskId: string, status: TestTask['status']) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const progress = status === 'done' ? 100 : status === 'todo' ? Math.min(task.progress, 10) : task.progress;
+    
+    try {
+      await apiPut(`/tasks/${taskId}`, { status, progress });
+      refetchTasks();
+    } catch(err) {
+      console.error(err);
+    }
   };
 
   if (pageMode === 'create') {
@@ -139,7 +200,7 @@ export function TasksViewWithTestData() {
         title="Nouvelle tâche"
         subtitle={activeProject ? `Tâches — ${activeProject.name}` : 'Tâches'}
         values={form}
-        members={TEST_TEAM_MEMBERS}
+        members={membersList}
         stages={scopedStages}
         submitLabel="Créer la tâche"
         onBack={() => setPageMode('list')}
@@ -157,7 +218,7 @@ export function TasksViewWithTestData() {
         title="Modifier la tâche"
         subtitle={task.title}
         values={form}
-        members={TEST_TEAM_MEMBERS}
+        members={membersList}
         stages={scopedStages}
         linkedProcessCount={task.linkedToProcesses?.length ?? 0}
         submitLabel="Enregistrer"
@@ -204,7 +265,7 @@ export function TasksViewWithTestData() {
     <TasksListPage
       projectName={activeProject.name}
       tasks={projectTasks}
-      members={TEST_TEAM_MEMBERS}
+      members={membersList}
       stages={scopedStages}
       onCreate={openCreate}
       onOpen={openView}

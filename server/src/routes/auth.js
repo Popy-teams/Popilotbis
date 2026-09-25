@@ -28,12 +28,13 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Mot de passe : 8 caractères minimum' });
     }
 
+    const userId = `user-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const passwordHash = await bcrypt.hash(password, 10);
     const result = await query(
-      `INSERT INTO users (email, password_hash, name, email_verified_at)
-       VALUES ($1, $2, $3, NOW())
+      `INSERT INTO users (id, email, password_hash, name, email_verified_at)
+       VALUES ($1, $2, $3, $4, NOW())
        RETURNING id, email, name, role, email_verified_at, created_at`,
-      [email.trim().toLowerCase(), passwordHash, name.trim()]
+      [userId, email.trim().toLowerCase(), passwordHash, name.trim()]
     );
 
     const user = publicUser(result.rows[0]);

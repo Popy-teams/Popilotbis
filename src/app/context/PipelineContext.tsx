@@ -23,6 +23,7 @@ import {
   savePipelineStages,
   syncAllPipelineStages,
 } from '../utils/pipelineSync';
+import { useApi } from '../hooks/useApi';
 
 interface PipelineContextValue {
   stages: PipelineStage[];
@@ -41,37 +42,62 @@ interface PipelineContextValue {
 const PipelineContext = createContext<PipelineContextValue | null>(null);
 
 export function PipelineProvider({ children }: { children: ReactNode }) {
-  const { matchesProject } = useProjectContext();
-  const [stages, setStages] = useState<PipelineStage[]>(() => {
-    const loadedTasks = loadAllTasks();
-    const loadedDocs = loadAllDocuments();
-    return syncAllPipelineStages(loadPipelineStages(), loadedTasks, loadedDocs);
-  });
-  const [tasks, setTasks] = useState<TestTask[]>(loadAllTasks);
-  const [documents, setDocuments] = useState<ISODocument[]>(loadAllDocuments);
-  const [risks, setRisks] = useState<Risk[]>(loadAllRisks);
+  const { activeProjectSlug, matchesProject, activeProject } = useProjectContext();
+  const [stages, setStages] = useState<PipelineStage[]>([]);
 
-  const refresh = useCallback(() => {
-    const loadedTasks = loadAllTasks();
-    const loadedDocs = loadAllDocuments();
-    const loadedRisks = loadAllRisks();
-    const synced = applyPipelineSync(loadedTasks, loadedDocs);
-    setTasks(loadedTasks);
-    setDocuments(loadedDocs);
-    setRisks(loadedRisks);
-    setStages(synced);
-  }, []);
+  const { data: apiStages, refetch: refetchStages } = useApi<any[]>(activeProject ? `/pipeline/${activeProject.id}` : null);
+  const { data: apiTasks, refetch: refetchTasks } = useApi<any[]>('/tasks');
+  const { data: apiDocs, refetch: refetchDocs } = useApi<any[]>('/documents');
+  const { data: apiRisks, refetch: refetchRisks } = useApi<any[]>('/risks');
+
+  const tasks = useMemo(() => {
+    if (!apiTasks) return [];
+    return apiTasks.map(t => ({
+      id: t.id,
+      title: t.title,
+      description: t.description || '',
+      projectId: t.project_id,
+      projectName: t.project_id,
+      assignedTo: t.assigned_to,
+      assignedToName: t.assigned_to_name || t.assigned_to,
+      status: t.status,
+      priority: t.priority,
+      dueDate: t.due_date ? new Date(t.due_date).toISOString().split('T')[0] : '',
+      progress: t.progress,
+      subtasks: [],
+      stageId: null,
+      linkedToProcesses: [],
+      linkedToProcessSteps: []
+    }));
+  }, [apiTasks]);
+  const documents = useMemo(() => apiDocs || [], [apiDocs]);
+  const risks = useMemo(() => apiRisks || [], [apiRisks]);
 
   useEffect(() => {
-    refresh();
-    const onUpdate = () => refresh();
-    window.addEventListener('popilot:pipeline-updated', onUpdate);
-    window.addEventListener('storage', onUpdate);
-    return () => {
-      window.removeEventListener('popilot:pipeline-updated', onUpdate);
-      window.removeEventListener('storage', onUpdate);
-    };
-  }, [refresh]);
+    if (apiStages) {
+      setStages(
+        apiStages.map((s) => ({
+          ...s,
+          projectId: s.project_id,
+          estimatedDuration: s.estimated_duration,
+          startDate: s.start_date,
+          endDate: s.end_date,
+          exitCriteria: s.exit_criteria || [],
+          objectives: s.objectives || [],
+          deliverables: s.deliverables || []
+        }))
+      );
+    } else {
+      setStages([]);
+    }
+  }, [apiStages]);
+
+  const refresh = useCallback(() => {
+    refetchStages();
+    refetchTasks();
+    refetchDocs();
+    refetchRisks();
+  }, [refetchStages, refetchTasks, refetchDocs, refetchRisks]);
 
   const scopedStages = useMemo(
     () => getStagesForProject(stages, matchesProject),
@@ -79,40 +105,70 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   );
 
   const syncFromTasks = useCallback((nextTasks: TestTask[], nextDocs?: ISODocument[]) => {
-    const docs = nextDocs ?? loadAllDocuments();
-    const synced = applyPipelineSync(nextTasks, docs);
-    setTasks(nextTasks);
-    if (nextDocs) setDocuments(nextDocs);
-    setStages(synced);
+    // Ignoré car désormais géré par l'API
   }, []);
 
   const updateStage = useCallback(
-    (stage: PipelineStage) => {
-      setStages((prev) => {
-        const next = prev.map((s) => (s.id === stage.id ? stage : s));
-        const synced = syncAllPipelineStages(next, tasks, documents);
-        savePipelineStages(synced);
-        return synced;
-      });
+    async (stage: PipelineStage) => {
+      try {
+        const res = await fetch(`/api/pipeline/${stage.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: stage.name,
+            order: stage.order,
+            status: stage.status,
+            progress: stage.progress,
+            objectives: stage.objectives,
+            deliverables: stage.deliverables,
+            exitCriteria: stage.exitCriteria,
+            startDate: stage.startDate,
+            endDate: stage.endDate,
+            estimatedDuration: stage.estimatedDuration
+          })
+        });
+        if (res.ok) refresh();
+      } catch (err) {
+        console.error(err);
+      }
     },
-    [tasks, documents]
+    [refresh]
   );
 
-  const addStage = useCallback((stage: PipelineStage) => {
-    setStages((prev) => {
-      const next = [...prev, stage];
-      savePipelineStages(next);
-      return next;
-    });
-  }, []);
+  const addStage = useCallback(async (stage: PipelineStage) => {
+    try {
+      const res = await fetch(`/api/pipeline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: stage.id,
+          projectId: stage.projectId,
+          name: stage.name,
+          order: stage.order,
+          status: stage.status,
+          progress: stage.progress,
+          objectives: stage.objectives,
+          deliverables: stage.deliverables,
+          exitCriteria: stage.exitCriteria,
+          startDate: stage.startDate,
+          endDate: stage.endDate,
+          estimatedDuration: stage.estimatedDuration
+        })
+      });
+      if (res.ok) refresh();
+    } catch (err) {
+      console.error(err);
+    }
+  }, [refresh]);
 
-  const removeStage = useCallback((id: string) => {
-    setStages((prev) => {
-      const next = prev.filter((s) => s.id !== id);
-      savePipelineStages(next);
-      return next;
-    });
-  }, []);
+  const removeStage = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/pipeline/${id}`, { method: 'DELETE' });
+      if (res.ok) refresh();
+    } catch (err) {
+      console.error(err);
+    }
+  }, [refresh]);
 
   const getRelatedForStage = useCallback(
     (stageId: string) => getStageRelatedEntities(stageId, tasks, documents, risks),

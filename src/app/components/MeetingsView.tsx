@@ -9,7 +9,9 @@ import {
   Link2,
   Sparkles,
 } from 'lucide-react';
+import { useApi, apiPost, apiPut, apiDelete } from '../hooks/useApi';
 import { useProjectContext } from '../context/ProjectContext';
+import { useAuth } from '../auth/AuthContext';
 import { usePipeline } from '../context/PipelineContext';
 import { calculateCurrentWriter, calculateNextWriter } from '../types/meetings';
 import type { ScrumMeetingRecord, ScrumMeetingType, GanttItem } from '../types/scrumMeetings';
@@ -51,14 +53,7 @@ import { TEST_TEAM_MEMBERS } from '../data/testData';
 type PageMode = 'list' | 'create' | 'view' | 'edit' | 'report';
 type ListTab = 'overview' | 'reports' | 'gantt';
 
-const ROTATION = {
-  id: 'rotation-1',
-  projectId: 'popy',
-  membersOrder: TEST_TEAM_MEMBERS.slice(0, 4).map((m) => m.id),
-  memberNames: TEST_TEAM_MEMBERS.slice(0, 4).map((m) => m.name),
-  periodDays: 15,
-  startDate: '2026-01-01',
-};
+
 
 function meetingToForm(m: ScrumMeetingRecord): MeetingFormValues {
   return {
@@ -70,6 +65,7 @@ function meetingToForm(m: ScrumMeetingRecord): MeetingFormValues {
     duration: m.duration,
     participants: m.participants,
     facilitator: m.facilitator ?? '',
+    writerName: m.writerName,
   };
 }
 
@@ -88,8 +84,8 @@ function buildMeetingFromForm(
     time: values.time,
     duration: values.duration,
     participants: values.participants,
-    writerId: writer.writerId,
-    writerName: writer.writerName,
+    writerId: values.writerName ? 'w-manual' : writer.writerId,
+    writerName: values.writerName || writer.writerName,
     facilitator: values.facilitator || undefined,
     status: base.status ?? 'planned',
     hasReport: base.hasReport ?? false,
@@ -107,11 +103,71 @@ function buildMeetingFromForm(
 }
 
 export function MeetingsView() {
-  const { matchesProject, activeProjectSlug, activeProject } = useProjectContext();
+  const { matchesProject, activeProject } = useProjectContext();
+  const { user } = useAuth();
   const { stages } = usePipeline();
+  
+  const { data: apiTeamMembers } = useApi<any[]>(
+    activeProject?.id ? `/team-members?project_id=${encodeURIComponent(activeProject?.id)}` : null
+  );
+  
+  const activeMembers = useMemo(() => {
+    if (!apiTeamMembers) return null;
+    return apiTeamMembers.filter(m => m.availability !== 'En congé');
+  }, [apiTeamMembers]);
+
+  const teamMemberNames = useMemo(() => {
+    if (!activeMembers || activeMembers.length === 0) {
+      return TEST_TEAM_MEMBERS.slice(0, 4).map((m) => m.name);
+    }
+    return activeMembers.map((m) => m.name || m.user_id || 'Membre');
+  }, [activeMembers]);
+
+  const ROTATION = useMemo(() => {
+    return {
+      id: 'rotation-1',
+      projectId: activeProject?.id ?? 'popy',
+      membersOrder: activeMembers && activeMembers.length > 0
+        ? activeMembers.map(m => m.user_id || m.id)
+        : TEST_TEAM_MEMBERS.slice(0, 4).map(m => m.id),
+      memberNames: teamMemberNames,
+      periodDays: 15,
+      startDate: '2026-01-01',
+    };
+  }, [activeMembers, teamMemberNames, activeProject]);
+
   const [pageMode, setPageMode] = useState<PageMode>('list');
   const [listTab, setListTab] = useState<ListTab>('overview');
-  const [meetings, setMeetings] = useState<ScrumMeetingRecord[]>(() => loadMeetings());
+  const [meetings, setMeetings] = useState<ScrumMeetingRecord[]>([]);
+  const { data: apiMeetings, refetch: refetchMeetings } = useApi<any[]>('/meetings');
+
+  useEffect(() => {
+    if (apiMeetings) {
+      const mapped = apiMeetings.map((m: any) => ({
+        id: m.id,
+        number: 1,
+        title: m.title,
+        meetingType: m.meeting_type as ScrumMeetingType,
+        date: m.date ? new Date(m.date).toISOString().split('T')[0] : '',
+        time: m.date ? new Date(m.date).toISOString().substring(11, 16) : '10:00',
+        duration: m.duration,
+        participants: Array.isArray(m.participant_ids) ? m.participant_ids : (typeof m.participant_ids === 'string' ? JSON.parse(m.participant_ids) : []),
+        writerId: 'w-1',
+        writerName: m.writer_name || ROTATION.memberNames[ROTATION.membersOrder.indexOf(calculateCurrentWriter(ROTATION, m.date ? new Date(m.date).toISOString() : new Date().toISOString()))] || 'Admin',
+        status: m.status,
+        hasReport: !!m.report,
+        projectId: m.project_id,
+        projectName: m.project_id,
+        agenda: defaultAgendaForType(m.meeting_type),
+        roundTable: [],
+        decisions: [],
+        actions: [],
+        notes: m.report
+      }));
+      setMeetings(mapped);
+    }
+  }, [apiMeetings]);
+
   const [ganttItems, setGanttItems] = useState<GanttItem[]>(() => loadGanttItems());
   const [selectedMeeting, setSelectedMeeting] = useState<ScrumMeetingRecord | null>(null);
   const [form, setForm] = useState<MeetingFormValues>(emptyMeetingForm());
@@ -131,10 +187,6 @@ export function MeetingsView() {
   const refreshGantt = () => setGanttItems(loadGanttItems());
 
   useEffect(() => {
-    saveMeetings(meetings);
-  }, [meetings]);
-
-  useEffect(() => {
     const onGantt = () => refreshGantt();
     window.addEventListener('popilot:gantt-updated', onGantt);
     return () => window.removeEventListener('popilot:gantt-updated', onGantt);
@@ -151,8 +203,8 @@ export function MeetingsView() {
   );
 
   const pipelineStages = useMemo(
-    () => getPipelineStagesForProject(activeProjectSlug ?? 'popy', stages),
-    [activeProjectSlug, stages]
+    () => getPipelineStagesForProject(activeProject?.id ?? 'popy', stages),
+    [activeProject?.id, stages]
   );
 
   const currentWriterId = calculateCurrentWriter(ROTATION, new Date().toISOString());
@@ -198,7 +250,7 @@ export function MeetingsView() {
   };
 
   const openCreate = (type: ScrumMeetingType = 'review') => {
-    const projectId = activeProjectSlug ?? 'popy';
+    const projectId = activeProject?.id ?? 'popy';
     const sprint = getSuggestedSprintNumber(meetings, projectId, type);
     const ceremonyNum = getNextMeetingNumber(meetings, type, projectId);
     const tomorrow = new Date();
@@ -208,14 +260,14 @@ export function MeetingsView() {
       sprintNumber: String(sprint),
       title: buildDefaultMeetingTitle(type, sprint, ceremonyNum),
       date: tomorrow.toISOString().slice(0, 10),
-      participants: TEST_TEAM_MEMBERS.slice(0, 4).map((m) => m.name),
+      participants: teamMemberNames,
     });
     setSelectedMeeting(null);
     setPageMode('create');
   };
 
   const applyCreateDefaultsForType = (type: ScrumMeetingType) => {
-    const projectId = activeProjectSlug ?? 'popy';
+    const projectId = activeProject?.id ?? 'popy';
     const sprint = getSuggestedSprintNumber(meetings, projectId, type);
     const ceremonyNum = getNextMeetingNumber(meetings, type, projectId);
     setForm((prev) => ({
@@ -227,7 +279,7 @@ export function MeetingsView() {
     }));
   };
 
-  const projectId = activeProjectSlug ?? 'popy';
+  const projectId = activeProject?.id ?? 'popy';
 
   const formPendingTasks = useMemo(() => {
     if (pageMode !== 'create' && pageMode !== 'edit') return [];
@@ -265,19 +317,22 @@ export function MeetingsView() {
     setPageMode('report');
   };
 
-  const deleteMeeting = (id: string) => {
+  const deleteMeeting = async (id: string) => {
     if (!confirm('Supprimer cette réunion ?')) return;
-    setMeetings((prev) => prev.filter((m) => m.id !== id));
+    try {
+      await apiDelete(`/meetings/${id}`);
+      refetchMeetings();
+    } catch(err) { console.error(err); }
     setSelectedMeeting(null);
     setPageMode('list');
   };
 
-  const submitForm = (e: React.FormEvent) => {
+  const submitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     const writer = getWriterForDate(form.date);
 
     if (pageMode === 'create') {
-      const projectId = activeProjectSlug ?? 'popy';
+      const projectId = activeProject?.id ?? 'popy';
       const nextNumber = getNextMeetingNumber(meetings, form.meetingType, projectId);
       const created = buildMeetingFromForm(form, {
         number: nextNumber,
@@ -285,20 +340,46 @@ export function MeetingsView() {
         projectName: activeProject?.name ?? 'POPY',
         status: 'planned',
       }, writer);
-      setMeetings((prev) => [created, ...prev]);
-      upsertPlannedMeetingCalendar(created);
+      
+      try {
+        await apiPost('/meetings', {
+          id: created.id,
+          title: created.title,
+          date: created.date + 'T' + created.time + ':00Z',
+          duration: created.duration,
+          project_id: created.projectId,
+          meeting_type: created.meetingType,
+          status: created.status,
+          participant_ids: created.participants,
+          writer_name: created.writerName
+        });
+        refetchMeetings();
+      } catch(err) { console.error(err); }
+
       setPageMode('list');
     } else if (pageMode === 'edit' && selectedMeeting) {
       const updated = buildMeetingFromForm(form, selectedMeeting, writer);
-      setMeetings((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
-      upsertPlannedMeetingCalendar(updated);
+      
+      try {
+        await apiPut(`/meetings/${updated.id}`, {
+          title: updated.title,
+          date: updated.date + 'T' + updated.time + ':00Z',
+          duration: updated.duration,
+          meeting_type: updated.meetingType,
+          status: updated.status,
+          participant_ids: updated.participants,
+          writer_name: updated.writerName
+        });
+        refetchMeetings();
+      } catch(err) { console.error(err); }
+
       setSelectedMeeting(updated);
       setPageMode('view');
     }
     setForm(emptyMeetingForm());
   };
 
-  const handlePublishReport = () => {
+  const handlePublishReport = async () => {
     if (!selectedMeeting) return;
     const allActions = mergeReportActions(reportForm);
     const draft: ScrumMeetingRecord = {
@@ -306,9 +387,59 @@ export function MeetingsView() {
       decisions: reportForm.decisions.filter((d) => d.description.trim()),
       actions: allActions,
       notes: reportForm.notes,
+      hasReport: true,
+      status: 'completed'
     };
     const result = publishMeetingReport(draft, pipelineStages);
-    setMeetings((prev) => prev.map((m) => (m.id === result.meeting.id ? result.meeting : m)));
+    
+    try {
+      await apiPut(`/meetings/${selectedMeeting.id}`, {
+         status: 'completed',
+         report: reportForm.notes
+      });
+      
+      for (const t of result.createdTasks) {
+        await apiPost('/tasks', {
+          id: t.id,
+          title: t.title,
+          description: t.description,
+          project_id: t.projectId,
+          assigned_to: t.assignedTo,
+          status: t.status,
+          priority: t.priority,
+          due_date: t.dueDate,
+          progress: t.progress
+        });
+      }
+
+      // Mettre à jour les tâches existantes
+      for (const a of result.meeting.actions) {
+        if (a.linkedTaskId && !result.createdTasks.some(t => t.id === a.linkedTaskId)) {
+          await apiPut(`/tasks/${a.linkedTaskId}`, {
+            status: a.status,
+            progress: a.status === 'completed' ? 100 : 0
+          });
+        }
+      }
+
+      for (const g of result.ganttItems) {
+        await apiPost('/gantt', {
+          id: g.id,
+          projectId: g.projectId,
+          label: g.label,
+          startDate: g.startDate,
+          endDate: g.endDate,
+          assignee: g.assignee,
+          taskId: g.taskId,
+          meetingId: g.meetingId,
+          status: 'planned'
+        });
+      }
+
+      refetchMeetings();
+      window.dispatchEvent(new CustomEvent('popilot:pipeline-updated'));
+    } catch(err) { console.error(err); }
+
     refreshGantt();
     const followUp = reportForm.followUpActions.length;
     const newCount = reportForm.newActions.filter((a) => a.description.trim()).length;
@@ -334,6 +465,7 @@ export function MeetingsView() {
         onSubmit={submitForm}
         onChange={setForm}
         onTypeChange={pageMode === 'create' ? applyCreateDefaultsForType : undefined}
+        teamMemberNames={teamMemberNames}
       />
     );
   }
@@ -357,6 +489,7 @@ export function MeetingsView() {
         meeting={selectedMeeting}
         form={reportForm}
         stages={pipelineStages}
+        members={activeMembers || []}
         onBack={() => { setPageMode('view'); }}
         onChange={setReportForm}
         onPublish={handlePublishReport}
@@ -480,7 +613,7 @@ export function MeetingsView() {
                   <MeetingCard
                     key={meeting.id}
                     meeting={meeting}
-                    highlight={meeting.writerName === currentWriterName}
+                    highlight={meeting.writerName === currentWriterName || meeting.writerName === user?.name}
                     onView={() => openView(meeting)}
                     onReport={() => openReport(meeting)}
                   />
@@ -500,7 +633,7 @@ export function MeetingsView() {
                 <MeetingCard
                   key={meeting.id}
                   meeting={meeting}
-                  highlight={meeting.writerName === currentWriterName && meeting.status === 'planned'}
+                  highlight={(meeting.writerName === currentWriterName || meeting.writerName === user?.name) && meeting.status === 'planned'}
                   onView={() => openView(meeting)}
                   onReport={() => openReport(meeting)}
                   onDelete={listTab === 'reports' ? () => deleteMeeting(meeting.id) : undefined}

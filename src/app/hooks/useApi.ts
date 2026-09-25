@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
 
-const API_BASE = `https://${projectId}.supabase.co/functions/v1/make-server-036a5a33`;
+const API_BASE = '/api';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -9,20 +8,30 @@ interface ApiResponse<T> {
   error?: string;
 }
 
-export function useApi<T>(endpoint: string) {
+function getAuthHeaders() {
+  const token = localStorage.getItem('popilot:auth-token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+export function useApi<T>(endpoint: string | null) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
+    if (!endpoint) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
       
       const response = await fetch(`${API_BASE}${endpoint}`, {
-        headers: {
-          Authorization: `Bearer ${publicAnonKey}`,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -56,10 +65,7 @@ export async function apiPost<T>(endpoint: string, body: any): Promise<T> {
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${publicAnonKey}`,
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(body),
     });
 
@@ -84,10 +90,7 @@ export async function apiPut<T>(endpoint: string, body: any): Promise<T> {
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${publicAnonKey}`,
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(body),
     });
 
@@ -112,9 +115,7 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${publicAnonKey}`,
-      },
+      headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
